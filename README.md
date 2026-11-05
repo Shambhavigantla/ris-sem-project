@@ -206,3 +206,20 @@ printed value within a factor of 2 of it.
 | A new search after that upload | `4 labels, items [1, 3, 6, 8]` | notebooks/07_counter_index.ipynb | 14 |
 | Paper's scheme: a kept dsk tested on a later upload | `with the kept dsk: MATCH` | notebooks/07_counter_index.ipynb | 15 |
 | Counter table versions a new device gets at L4 | `versions returned [8, 8]` | notebooks/07_counter_index.ipynb | 16 |
+| Kernel pinned to one performance core for the scaling runs | `kernel main thread affinity: [2]` | notebooks/08_search_scaling.ipynb | 1 |
+| Real Ct and entry sizes the filler copies | `[(4256, 108)] B` | notebooks/08_search_scaling.ipynb | 3 |
+| Paper's slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, paper: slowest server median ~1.11 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, counter index: slowest server median ~7.36 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's sum over servers, N = 3, 10^4 files, 5 runs | `N = 3, 10000 files, paper: slowest server median 976 ms, sum over servers median ~2.80 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median ~1.19 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's sum over servers, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median ~3.29 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median ~6.82 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| User's time, paper, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median 3.29 s, U median ~3.56 s` | notebooks/08_search_scaling.ipynb | 4 |
+| User's time, counter index, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median 6.82 ms, sum over servers median 18.0 ms, U median ~3.96 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, paper: slowest server median ~961 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, counter index: slowest server median ~6.95 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Crossover, N = 3 | `N = 3: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 5 | `N = 5: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 7 | `N = 7: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Lookups per server in every counter index run | `lookups per server in every counter index run: [3]` | notebooks/08_search_scaling.ipynb | 6 |
+| Failed checks over every scaling run | `failures over all 144 checked runs: 0` | notebooks/08_search_scaling.ipynb | 6 |

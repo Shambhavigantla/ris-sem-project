@@ -1,4 +1,6 @@
-"""Measurement code for notebook 05 (Sec. VI cost tables). Nothing here is protocol code.
+"""Measurement code for notebooks 05 (Sec. VI cost tables) and 08 (search scaling). Nothing here is protocol code.
+
+The fill_* helpers write filler straight into server state for notebook 08 and skip Outsource.
 
 It pins the process to one CPU, reads that CPU's clock and load, times the party calls of a
 trial, counts failed checks, counts PRF chains a_x per party, and formats the results. A trial
@@ -325,3 +327,48 @@ def negacyclic_schoolbook(row: NDArray[Any], small: NDArray[Any], q: int) -> NDA
     n = len(row)
     full = np.convolve(row, small)
     return (full[:n] - np.append(full[n:], 0)) % q
+
+
+def fill_qpase_storage(server: Any, user_id: str, count: int, index_ct_size: int, first_item_id: int, data_ct: bytes) -> int:
+    """Append `count` filler items for the paper's scheme straight into `server.storage[user_id]`.
+
+    Not protocol code: this skips Outsource, its signature check and the M-slot limit, so that notebook 08
+    can reach 10^5 stored items without a PRF chain and a signature per item. Each filler Ct is AES-256-GCM
+    of random bytes under its own fresh random key, `index_ct_size` bytes long like a real Ct, so Dec(dsk, Ct)
+    fails at the tag exactly as for another keyword's item. Every filler shares the one `data_ct`, which R2
+    never reads for an item that fails Dec. Item ids run from `first_item_id`. Returns the new item count.
+    """
+    from .parties.types import StoredItem
+    from .primitives.symmetric import KEY_SIZE, NONCE_SIZE, TAG_SIZE, encrypt
+
+    if index_ct_size < NONCE_SIZE + TAG_SIZE:
+        raise ValueError(f"a Ct is at least {NONCE_SIZE + TAG_SIZE} bytes, got {index_ct_size}")
+    items = server.storage.setdefault(user_id, [])
+    for k in range(count):
+        index_ct = encrypt(os.urandom(KEY_SIZE), os.urandom(index_ct_size - NONCE_SIZE - TAG_SIZE))
+        items.append(StoredItem(index_ct=index_ct, data_ct=data_ct, item_id=first_item_id + k))
+    return len(items)
+
+
+def fill_counter_index(server: Any, user_id: str, count: int, entry_size: int) -> int:
+    """Add `count` filler rows for the counter index straight into `server.index[user_id]`.
+
+    Not protocol code: this skips Outsource, its signature check and the M-row limit, and stores no file.
+    Each row is a random 32-byte label and a random entry of `entry_size` bytes, the length of a real entry.
+    Returns the new row count.
+    """
+    from .counter_index import LABEL_SIZE
+
+    rows = server.index.setdefault(user_id, {})
+    target = len(rows) + count
+    while len(rows) < target:
+        rows[os.urandom(LABEL_SIZE)] = os.urandom(entry_size)
+    return len(rows)
+
+
+def spread_evenly(total: int, parts: int) -> list[int]:
+    """`total` split into `parts` counts that differ by at most one, the larger ones first."""
+    if parts < 1 or total < 0:
+        raise ValueError(f"need parts >= 1 and total >= 0, got {parts} and {total}")
+    base, extra = divmod(total, parts)
+    return [base + (k < extra) for k in range(parts)]
