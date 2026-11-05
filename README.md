@@ -194,3 +194,15 @@ printed value within a factor of 2 of it.
 | Retrieve traffic, 2 matching 100 KB documents | `Retrieve: U -> S 12645 B, S -> U 208568 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
 | Key update traffic between servers, N = 3 | `Key update: U -> S 0 B, S -> U 0 B, S -> S 39264 B` | notebooks/05_costs.ipynb | 11 |
 | Failed checks over every timed run | `failures over all 270 checked runs: 0` | notebooks/05_costs.ipynb | 12 |
+| Counter index: label and entry sizes | `label 32 B + entry 108 B` | notebooks/07_counter_index.ipynb | 4 |
+| Counter index: Outsource request for item 1 | `= 2742 B with the user id` | notebooks/07_counter_index.ipynb | 4 |
+| Sealed counter table, one 1024-byte block | `sealed 1072 B` | notebooks/07_counter_index.ipynb | 5 |
+| Counter table upload to each server | `CounterTableUpload to each server: 3497 B` | notebooks/07_counter_index.ipynb | 5 |
+| Keywords found in any server's stored bytes | `{'invoice': [], 'medical': [], 'meeting': [], 'travel': []}` | notebooks/07_counter_index.ipynb | 7 |
+| Label search request for c_w = 3, to each server | `LabelSearchRequest, 2521 B` | notebooks/07_counter_index.ipynb | 9 |
+| File fetch request for one item | `FileFetchRequest for items [1], 2425 B` | notebooks/07_counter_index.ipynb | 12 |
+| Files recovered for medical, and lookups per server | `recovered items [1, 3, 6], equal to the originals; lookups per server [3, 3, 3]` | notebooks/07_counter_index.ipynb | 13 |
+| A kept search request replayed after a new upload | `replaying the kept request: hits per server [1, 1, 1], items [1, 3, 6]` | notebooks/07_counter_index.ipynb | 14 |
+| A new search after that upload | `4 labels, items [1, 3, 6, 8]` | notebooks/07_counter_index.ipynb | 14 |
+| Paper's scheme: a kept dsk tested on a later upload | `with the kept dsk: MATCH` | notebooks/07_counter_index.ipynb | 15 |
+| Counter table versions a new device gets at L4 | `versions returned [8, 8]` | notebooks/07_counter_index.ipynb | 16 |
