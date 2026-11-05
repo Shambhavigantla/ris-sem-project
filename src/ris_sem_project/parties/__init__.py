@@ -4,9 +4,15 @@ from .adversary import Adversary, Challenger, PasswordGuessingAdversary
 from .base import Party
 from .server import Server
 from .types import (
+    CounterTableUpload,
     DKGShare,
+    FileFetchRequest,
+    FileFetchResponse,
+    IndexedOutsourceRequest,
     Keyword,
     KeyUpdateShare,
+    LabelSearchRequest,
+    LabelSearchResponse,
     LoginProof,
     OutsourceRequest,
     ProtocolAbort,
@@ -27,9 +33,15 @@ from .user import User
 __all__ = [
     "Adversary",
     "Challenger",
+    "CounterTableUpload",
     "DKGShare",
+    "FileFetchRequest",
+    "FileFetchResponse",
+    "IndexedOutsourceRequest",
     "Keyword",
     "KeyUpdateShare",
+    "LabelSearchRequest",
+    "LabelSearchResponse",
     "LoginProof",
     "OutsourceRequest",
     "Party",

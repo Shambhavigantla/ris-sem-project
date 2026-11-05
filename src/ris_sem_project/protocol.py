@@ -1,5 +1,8 @@
 """Whole QPASE phases (Sec. IV-A to IV-F, Fig. 5-6), run by moving messages between parties.
 
+The ci_* functions run the counter-index Login, Outsource and Retrieve of docs/counter-index-spec.md
+on CounterIndexServer instances, which also run every phase of the paper.
+
 Each function returns a record of every message it moved and what U computed from them, so a
 notebook can show a run without re-implementing a step.
 """
@@ -9,12 +12,20 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations_with_replacement
 
+from .counter_index import CounterTable
+from .parties.counter_index_server import CounterIndexServer, LabelSearch, StoreOutcome
+from .parties.counter_index_user import CounterIndexUser, OpenedHit
 from .parties.qpase_server import PeerLink, QPASEServer, RetrieveScan, ShareCheck, ShareOutcome
 from .parties.qpase_user import OpenedItem, QPASEUser
 from .parties.types import (
+    CounterTableUpload,
     DKGShare,
+    FileFetchRequest,
+    FileFetchResponse,
+    IndexedOutsourceRequest,
     Keyword,
     KeyUpdateShare,
+    LabelSearchRequest,
     LoginProof,
     OutsourceRequest,
     ProtocolAbort,
@@ -103,13 +114,15 @@ def dkg(servers: Mapping[ServerID, QPASEServer]) -> DKGRun:
     return DKGRun(shares=dealt)
 
 
-def setup_servers(pp: PublicParams, capacity: int = 1000) -> dict[ServerID, QPASEServer]:
-    """S_1, ..., S_N with M = capacity, keyed by the DKG.
+def setup_servers(
+    pp: PublicParams, capacity: int = 1000, server_type: type[QPASEServer] = QPASEServer
+) -> dict[ServerID, QPASEServer]:
+    """S_1, ..., S_N of server_type with M = capacity, keyed by the DKG.
 
     Every server also learns every server's ML-DSA-44 verification key, and every pair (S_j, S_i),
     S_j = S_i included, gets a fresh channel key for E(i, .) of the key update.
     """
-    servers = {i: QPASEServer(pp, i, capacity) for i in range(1, pp.N + 1)}
+    servers = {i: server_type(pp, i, capacity) for i in range(1, pp.N + 1)}
     for i, j in combinations_with_replacement(servers, 2):
         channel_key = os.urandom(KEY_SIZE)
         servers[i].add_peer(j, PeerLink(verification_key=servers[j].verification_key, channel_key=channel_key))
@@ -183,3 +196,123 @@ def retrieve(user: QPASEUser, servers: Mapping[ServerID, QPASEServer], keyword: 
     scans = {i: server.retrieve_scan(request) for i, server in servers.items()}
     opened = user.retrieve_open([keyword], [scan.response for scan in scans.values()])
     return RetrieveRun(request=request, scans=scans, opened=tuple(opened))
+
+
+# --------------------------------------------------------------------------
+# Counter-based search index (docs/counter-index-spec.md)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IndexedLoginRun:
+    """Login L1 to L3 as in `login`, then L4 on the same servers."""
+
+    login: LoginRun
+    uploads: dict[ServerID, CounterTableUpload | None]
+    """L4: the counter table each contacted server returned, None from a server that holds none."""
+    table: CounterTable
+    """The counter table U kept."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IndexedOutsourceRun:
+    """Counter-index Outsource of one file to one server, then the new counter table to every server."""
+
+    server_id: ServerID
+    requests: tuple[IndexedOutsourceRequest, ...]
+    """One request, or two when the first label was a DUPLICATE_LABEL."""
+    outcomes: tuple[StoreOutcome, ...]
+    """The server's answer to each request."""
+    upload: CounterTableUpload
+    """The counter table sent to all N servers, which all accepted it."""
+
+    @property
+    def request(self) -> IndexedOutsourceRequest:
+        """The request the server stored."""
+        return self.requests[-1]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IndexedRetrieveRun:
+    """Counter-index Retrieve R1 to R5. Every field is empty when c_w = 0, since then no server is contacted."""
+
+    request: LabelSearchRequest | None
+    """R1, sent to every server."""
+    searches: dict[ServerID, LabelSearch]
+    """R2 at each server, with its lookup count."""
+    hits: tuple[OpenedHit, ...]
+    """R3: the rows U kept."""
+    fetch_requests: dict[ServerID, FileFetchRequest]
+    """R4, to each server that returned a kept row."""
+    fetch_responses: dict[ServerID, FileFetchResponse]
+    files: tuple[bytes, ...]
+    """R5: every recovered d, ordered by item id."""
+
+    @property
+    def labels(self) -> tuple[bytes, ...]:
+        """label(w, j) for j = 1..c_w."""
+        return () if self.request is None else self.request.labels
+
+
+def ci_login(
+    user: CounterIndexUser, servers: Mapping[ServerID, CounterIndexServer], server_ids: Sequence[ServerID]
+) -> IndexedLoginRun:
+    """`login`, then L4: every contacted server's stored counter table, of which U keeps the newest valid one."""
+    run = login(user, servers, server_ids)
+    uploads = {i: servers[i].counter_table(user.user_id) for i in run.requests}
+    table = user.load_counter_tables(list(uploads.values()))
+    return IndexedLoginRun(login=run, uploads=uploads, table=table)
+
+
+def ci_outsource(
+    user: CounterIndexUser,
+    servers: Mapping[ServerID, CounterIndexServer],
+    server_id: ServerID,
+    keyword: Keyword,
+    data: bytes,
+    item_id: int,
+) -> IndexedOutsourceRun:
+    """Steps 1-3 with the chosen server; on DUPLICATE_LABEL step 5 retries once with the next label.
+    Once stored, step 4: c_w += 1 and the new counter table goes to all N servers.
+
+    Raises ProtocolAbort if the server refuses the row or a server refuses the table.
+    """
+    requests, outcomes = [], []
+    for attempt in range(2):
+        requests.append(user.indexed_outsource(keyword, data, item_id))
+        outcomes.append(servers[server_id].indexed_outsource_store(requests[-1]))
+        if outcomes[-1] is StoreOutcome.STORED:
+            break
+        if outcomes[-1] is not StoreOutcome.DUPLICATE_LABEL or attempt == 1:
+            raise ProtocolAbort(f"S_{server_id} refused the row: {outcomes[-1].name}")
+        user.skip_label(keyword)
+    upload = user.confirm_outsource(keyword)
+    refused = [i for i, server in servers.items() if not server.store_counter_table(upload)]
+    if refused:
+        raise ProtocolAbort(f"servers {refused} refused counter table version {upload.version}")
+    return IndexedOutsourceRun(server_id=server_id, requests=tuple(requests), outcomes=tuple(outcomes), upload=upload)
+
+
+def ci_retrieve(
+    user: CounterIndexUser, servers: Mapping[ServerID, CounterIndexServer], keyword: Keyword
+) -> IndexedRetrieveRun:
+    """R1 to every server, R2 on each, R3 at U, R4 to each server that returned a kept row, R5 at U."""
+    request = user.label_search_request(keyword)
+    if request is None:
+        return IndexedRetrieveRun(request=None, searches={}, hits=(), fetch_requests={}, fetch_responses={}, files=())
+    searches = {i: server.label_search(request) for i, server in servers.items()}
+    hits = user.open_hits(keyword, [search.response for search in searches.values()])
+    wanted: dict[ServerID, list[int]] = {}
+    for hit in hits:
+        wanted.setdefault(hit.server_id, []).append(hit.item_id)
+    fetch_requests = {i: user.fetch_request(sorted(ids)) for i, ids in sorted(wanted.items())}
+    fetch_responses = {i: servers[i].fetch_files(fetch) for i, fetch in fetch_requests.items()}
+    files = user.open_files(hits, list(fetch_responses.values()))
+    return IndexedRetrieveRun(
+        request=request,
+        searches=searches,
+        hits=tuple(hits),
+        fetch_requests=fetch_requests,
+        fetch_responses=fetch_responses,
+        files=tuple(files),
+    )
