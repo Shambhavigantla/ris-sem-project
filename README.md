@@ -41,9 +41,10 @@ Everything lives in `src/ris_sem_project/`. The notebooks only call these module
 - `counter_index.py` has the pure functions of the counter index: labels, the index keys, sealing and opening entries, and the counter table.
 - `parties/counter_index_server.py` and `parties/counter_index_user.py` have `CounterIndexServer` and `CounterIndexUser`. They extend `QPASEServer` and `QPASEUser` with the counter index.
 - `protocol.py` runs whole phases (DKG, Register, Login, Outsource, Retrieve, server key update) and returns a record of every message. `ci_login`, `ci_outsource` and `ci_retrieve` run the counter index's phases.
-- `bench.py` has the measuring code of notebooks 05 and 08, and the filler helpers that write straight into server state for notebook 08.
+- `bench.py` has the measuring code of notebooks 05 and 08, the filler helpers that write straight into server state for notebook 08, and the machine summary and resource line every notebook prints last.
+- `figures.py` draws the README's figures with matplotlib, from values the notebooks measured, and saves each as SVG and PNG in `docs/figures/`. It computes nothing.
 - `root_attack.py` is the PARAM II offline password test shown in notebook 06.
-- `display.py` formats values for the notebooks and computes nothing.
+- `display.py` formats values for the notebooks, including the Markdown tables pasted into this README, and computes nothing.
 
 The notebooks in `notebooks/` show each phase with the data that crosses the wire:
 
@@ -102,14 +103,13 @@ costs the user what the paper's Outsource does: one chain (the label, in place o
 signatures (the row and the counter table, in place of `sig_C` and `sig_Ct`). It also sends the counter table
 to all `N` servers.
 
-**Measured search time** (notebook 08, PARAM I, `t = 2`, 3 matching files, one per server on `S_1` to `S_3`).
-At every storage size from 10^2 to 10^5 files and every `N` in 3, 5, 7, the counter index's slowest server
-took a few milliseconds and the paper's about a second, so the counter index searched faster at every measured
-size. There is no crossover. The paper's R2 grew little with storage: with `N = 3` its sum over servers went
-from about 2.8 s at 10^4 files to about 3.3 s at 10^5. Most of its time is the one PRF chain a server runs for
-each matching item, plus the ML-DSA-44 checks. A failed AES-GCM tag check on a non-matching item is cheap,
-as the spec expected. The user's time was about the same in both schemes, a few seconds, because both run one
-PRF chain per matching file (`v` in the paper, the label here) plus one for `dsk` or `K_w`.
+**Measured search time.** Notebook 08 measures both schemes at 10^2 to 10^5 stored files with `N = 3, 5, 7`
+servers. [Search time against storage size](#search-time-against-storage-size-notebook-08) has the figure and
+the full table. The counter index searched faster at every measured size, with no crossover. Most of the
+paper's search time at a server is the one PRF chain it runs for each matching item, plus the ML-DSA-44 checks.
+A failed AES-GCM tag check on a non-matching item is cheap, as the spec expected, so the paper's time grows
+little with storage. The user's time is about the same in both schemes, because both run one PRF chain per
+matching file (`v` in the paper, the label here) plus one for `dsk` or `K_w`.
 
 ## Server key update
 
@@ -131,6 +131,56 @@ uv sync
 `uv sync` builds `.venv/` with Python 3.14 and the packages pinned in `uv.lock`, including the dev packages that
 the notebook runner needs. Every command below uses that environment through `.venv/bin/python`.
 
+## System requirements
+
+To run the code and every notebook you need:
+
+- **Linux.** The protocol code is plain Python. The cost notebooks read `/proc` and `/sys` to pin a CPU and to
+  report time and memory, and the project has only been run on Linux on x86-64.
+- **Python 3.14 and the packages in `uv.lock`.** `uv sync` installs both (see [Set up](#set-up)). Nothing else
+  is needed.
+- **At least three logical CPUs for the timing notebooks.** Notebooks 05 and 08 pin themselves to CPU 2 and
+  need an otherwise idle machine. With fewer CPUs they run unpinned, say so in their first cell, and their
+  timings are rougher.
+- **Memory and time.** Notebook 08 needs the most of both by far. The table below gives each notebook's wall
+  time and peak memory on the test machine.
+
+### Test machine
+
+Every number in [Results](#results) was measured on this machine, which ran Arch Linux. Timings belong to this
+machine. Byte sizes, counts and pass or fail results are the same on any machine.
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Processor and logical CPUs | `CPU: 13th Gen Intel(R) Core(TM) i5-13500, 20 logical CPUs` | notebooks/01_preliminaries.ipynb | 13 |
+| Memory | `memory: 15.3 GiB` | notebooks/01_preliminaries.ipynb | 13 |
+| Operating system kernel | `OS: Linux 7.2.11-arch1-1 (x86_64)` | notebooks/01_preliminaries.ipynb | 13 |
+| Python | `Python: 3.14.9` | notebooks/01_preliminaries.ipynb | 13 |
+| Package versions | `packages: numpy 2.5.3, cryptography 50.0.2, dilithium-py 1.4.0, ipykernel 7.4.0, nbclient 0.11.0, matplotlib 3.11.2` | notebooks/01_preliminaries.ipynb | 13 |
+
+### Runtime and memory per notebook
+
+Each notebook's last cell prints its own kernel's wall time since start, CPU time and peak resident memory.
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Notebook 01: wall time of its kernel | `kernel: ~9 s wall` | notebooks/01_preliminaries.ipynb | 13 |
+| Notebook 01: peak memory of its kernel | `peak memory ~117 MiB` | notebooks/01_preliminaries.ipynb | 13 |
+| Notebook 02: wall time of its kernel | `kernel: ~35 s wall` | notebooks/02_register_login.ipynb | 13 |
+| Notebook 02: peak memory of its kernel | `peak memory ~118 MiB` | notebooks/02_register_login.ipynb | 13 |
+| Notebook 03: wall time of its kernel | `kernel: ~18 s wall` | notebooks/03_outsource_retrieve.ipynb | 17 |
+| Notebook 03: peak memory of its kernel | `peak memory ~114 MiB` | notebooks/03_outsource_retrieve.ipynb | 17 |
+| Notebook 04: wall time of its kernel | `kernel: ~22 s wall` | notebooks/04_server_key_update.ipynb | 13 |
+| Notebook 04: peak memory of its kernel | `peak memory ~135 MiB` | notebooks/04_server_key_update.ipynb | 13 |
+| Notebook 05: wall time of its kernel | `kernel: ~141 s wall` | notebooks/05_costs.ipynb | 14 |
+| Notebook 05: peak memory of its kernel | `peak memory ~148 MiB` | notebooks/05_costs.ipynb | 14 |
+| Notebook 06: wall time of its kernel | `kernel: ~43 s wall` | notebooks/06_param_ii_offline_guessing.ipynb | 8 |
+| Notebook 06: peak memory of its kernel | `peak memory ~121 MiB` | notebooks/06_param_ii_offline_guessing.ipynb | 8 |
+| Notebook 07: wall time of its kernel | `kernel: ~21 s wall` | notebooks/07_counter_index.ipynb | 18 |
+| Notebook 07: peak memory of its kernel | `peak memory ~117 MiB` | notebooks/07_counter_index.ipynb | 18 |
+| Notebook 08: wall time of its kernel | `kernel: ~828 s wall` | notebooks/08_search_scaling.ipynb | 8 |
+| Notebook 08: peak memory of its kernel | `peak memory ~574 MiB` | notebooks/08_search_scaling.ipynb | 8 |
+
 ## Run the tests
 
 From the repository root:
@@ -150,11 +200,244 @@ To run every notebook in `notebooks/` top to bottom in a fresh kernel and save i
 To run some of them, pass their paths, for example `.venv/bin/python scripts/run_notebooks.py notebooks/03_outsource_retrieve.ipynb`.
 Each notebook ends with assertion cells, so a notebook that runs without error means the property it shows held.
 
-To check every row of [Numeric claims](#numeric-claims) against the saved notebook outputs:
+To check every number in this README against the saved notebook outputs (see [Numeric claims](#numeric-claims)):
 
 ```sh
 .venv/bin/python scripts/check_readme_claims.py
 ```
+
+## Results
+
+All figures and tables below come from one run of `scripts/run_notebooks.py` on the
+[test machine](#test-machine), with the notebooks committed next to this README. The parameter set is PARAM I
+with `N = 3` servers and threshold `t = 2` unless a row says otherwise. Compare timings only with each other,
+because they belong to this machine. On the same machine the unit suite passed in full: 184 tests, from
+`.venv/bin/python -m unittest discover -s tests` (a command, not a notebook cell).
+
+The figures are drawn with matplotlib on a white background and saved in `docs/figures/` twice: as SVG, which
+this README shows, and as PNG at 200 dpi for a report. The caption of each figure, and the metadata of both files,
+name the notebook cell that drew it.
+
+### Building blocks (notebook 01)
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Table II modulus q = 2^28 - 57 | `q = 268435399` | notebooks/01_preliminaries.ipynb | 2 |
+| PARAM I ring degree | `n = 512` | notebooks/01_preliminaries.ipynb | 2 |
+| PARAM II ring degree | `n = 595` | notebooks/01_preliminaries.ipynb | 2 |
+| Gadget width, ceil(log2 q) | `ell = 28` | notebooks/01_preliminaries.ipynb | 2 |
+| Rounding modulus of the BP PRF | `p = 2` | notebooks/01_preliminaries.ipynb | 2 |
+| Standard deviation of chi_sigma | `sigma = 3.2` | notebooks/01_preliminaries.ipynb | 2 |
+| Bit length of PRF and TOPRF inputs | `L = 128` | notebooks/01_preliminaries.ipynb | 2 |
+| Size of each public a, a_0, a_1 | `57344 B` | notebooks/01_preliminaries.ipynb | 2 |
+| Random R_q products equal to an exact integer reference | `3/3` | notebooks/01_preliminaries.ipynb | 3 |
+| Output bits of one BP PRF evaluation | `14336 bits` | notebooks/01_preliminaries.ipynb | 5 |
+| Median time of one BP PRF evaluation, 7 runs | `over 7 runs: median ~0.46 s` | notebooks/01_preliminaries.ipynb | 6 |
+| Largest TOPRF noise coefficient 2e'' in one run | `max \|2e''\| = ~5000` | notebooks/01_preliminaries.ipynb | 10 |
+| q/4, the extractor's noise bound | `q/4 = 67108849` | notebooks/01_preliminaries.ipynb | 10 |
+| Size of K_u and of an HKDF output | `1792 B` | notebooks/01_preliminaries.ipynb | 11 |
+
+### Register and login (notebook 02)
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Servers, threshold and attempt limit in notebook 02 | `N = 3, t = 2, mu = 14` | notebooks/02_register_login.ipynb | 2 |
+| TOPRF request to each server (user id and b) | `57349 B` | notebooks/02_register_login.ipynb | 4 |
+| Register TOPRF response from each server | `114688 B` | notebooks/02_register_login.ipynb | 4 |
+| Size of pk_u (ML-DSA-44 public key) | `1312 B` | notebooks/02_register_login.ipynb | 5 |
+| Register step 2 message (pk_u and hint) | `RegisterKeyMessage: 3109 B` | notebooks/02_register_login.ipynb | 5 |
+| Login L1 response from each server | `L1 response per server: 117792 B` | notebooks/02_register_login.ipynb | 6 |
+| Login L2 proof to each server | `L2 proof per server: 2457 B` | notebooks/02_register_login.ipynb | 6 |
+| Repeated correct logins with byte-identical K_u | `10/10 logins gave byte-identical K_u` | notebooks/02_register_login.ipynb | 10 |
+| Median time of one Login with 2 servers, 10 runs | `over 10 runs: median ~2.19 s` | notebooks/02_register_login.ipynb | 10 |
+| Attempt count at which S_2 refuses L1 | `mu_u = 14 reached the limit mu = 14` | notebooks/02_register_login.ipynb | 11 |
+
+### Encrypted search (notebook 03)
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Size of the index ciphertext Ct | `Ct 4256 B` | notebooks/03_outsource_retrieve.ipynb | 4 |
+| Size of sig_Ct (ML-DSA-44 signature) | `sig_Ct 2420 B` | notebooks/03_outsource_retrieve.ipynb | 4 |
+| Retrieve request to each server (user id, dsk, sig_dsk) | `RetrieveRequest, 4217 B` | notebooks/03_outsource_retrieve.ipynb | 9 |
+| Time of R2 on all 3 servers, 7 stored items, 3 matches | `R2 on all 3 servers: ~1.42 s` | notebooks/03_outsource_retrieve.ipynb | 10 |
+| Items recovered for the keyword medical | `recovered items [1, 3, 6]` | notebooks/03_outsource_retrieve.ipynb | 12 |
+
+### Server key update (notebook 04)
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Key update shares that pass step 4, N = 3 | `shares accepted: 9 of 9` | notebooks/04_server_key_update.ipynb | 6 |
+| Payload of one key update share at t = 2 (h, E(i, F_ji), sig_j) | `6544 B` | notebooks/04_server_key_update.ipynb | 5 |
+| Size of a key share k_i | `(2048 B)` | notebooks/04_server_key_update.ipynb | 4 |
+| Epochs after two key updates | `epochs: [2, 2, 2]` | notebooks/04_server_key_update.ipynb | 11 |
+
+### Computation cost (notebook 05)
+
+![Computation time per phase, user and one server](docs/figures/phase_costs.svg)
+
+**Figure 1.** Computation time of each phase at the user and at one server: the median of 7 runs (dot) and the
+fastest to the slowest run (error bar), on a log scale. Drawn by `notebooks/05_costs.ipynb`, cell 13.
+
+The building blocks, one PRF evaluation `a_x` first:
+
+Source: `notebooks/05_costs.ipynb`, cell 13.
+
+| building block | median | range (min to max) | runs |
+| --- | --- | --- | --- |
+| a_x | 492 ms | 490 ms to 496 ms | 7 |
+| Ring.mul (ell, n) x (n,) | 0.67 ms | 0.66 ms to 0.71 ms | 31 |
+| ML-DSA-44 keygen | 3.94 ms | 3.85 ms to 4.01 ms | 101 |
+| ML-DSA-44 sign | 19.8 ms | 10.1 ms to 85.6 ms | 101 |
+| ML-DSA-44 verify | 4.79 ms | 4.71 ms to 5.37 ms | 101 |
+| AES-256-GCM encrypt 100 KB | 0.021 ms | 0.021 ms to 0.023 ms | 31 |
+| AES-256-GCM decrypt 100 KB | 0.021 ms | 0.020 ms to 0.022 ms | 31 |
+| linear hash H | 0.20 ms | 0.20 ms to 0.21 ms | 31 |
+| TOPRF blind (U) | 1.15 ms | 1.14 ms to 1.17 ms | 7 |
+| TOPRF evaluate (S_i) | 1.09 ms | 1.09 ms to 1.10 ms | 7 |
+| TOPRF combine (U) | 1.04 ms | 1.04 ms to 1.06 ms | 7 |
+
+Each phase per party. "PRF chains" counts the lattice PRF evaluations the phase runs. "Share in PRF chains" is
+the chain count times the `a_x` time measured right after each run, divided by that run's phase time. It can
+read slightly above 100% when `a_x` ran a little slower than inside the phase, and it then means the phase is
+all PRF work. The limiter is the term of the cost model that takes the largest share.
+
+Source: `notebooks/05_costs.ipynb`, cell 13.
+
+| phase | party | median | range (min to max) | PRF chains | share in PRF chains | limiter (share of time) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Register | user | 1.39 s | 1.39 s to 1.40 s | 3 | 102% | PRF chains a_x (102%) |
+| Register | one server (S_1) | 1.19 ms | 1.18 ms to 1.20 ms | 0 | 0% | TOPRF evaluate (92%) |
+| Login | user | 1.90 s | 1.88 s to 1.91 s | 4 | 97% | PRF chains a_x (97%) |
+| Login | one server (S_1) | 5.94 ms | 5.87 ms to 5.97 ms | 0 | 0% | ML-DSA-44 verify (81%) |
+| Outsource (100 KB) | user | 994 ms | 943 ms to 1.05 s | 2 | 93% | PRF chains a_x (93%) |
+| Outsource (100 KB) | one server (S_1) | 4.95 ms | 4.91 ms to 4.97 ms | 0 | 0% | ML-DSA-44 verify (97%) |
+| Retrieve | user | 1.50 s | 1.49 s to 1.52 s | 3 | 92% | PRF chains a_x (92%) |
+| Retrieve | one server (S_1) | 1000 ms | 998 ms to 1.00 s | 2 | 92% | PRF chains a_x (92%) |
+| Key update | one server (S_1) | 108 ms | 69.6 ms to 193 ms | 0 | 0% | ML-DSA-44 sign (68%) |
+| Key update | all 3 servers | 326 ms | 271 ms to 433 ms | 0 | 0% | ML-DSA-44 sign (67%) |
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Kernel pinned to one performance core for the cost runs | `kernel main thread affinity: [2]` | notebooks/05_costs.ipynb | 1 |
+| Median time of one PRF chain a_x, 7 runs | `one PRF chain a_x: median ~492 ms` | notebooks/05_costs.ipynb | 3 |
+| Median time of one ML-DSA-44 signature, 101 runs | `ML-DSA-44 sign: median ~20 ms` | notebooks/05_costs.ipynb | 4 |
+| Register at the user, 7 runs | `Register at U: median ~1389 ms` | notebooks/05_costs.ipynb | 5 |
+| Login at the user, 7 runs | `Login at U: median ~1897 ms` | notebooks/05_costs.ipynb | 6 |
+| Outsource of a 100 KB document at the user, 7 runs | `at U: median ~994 ms` | notebooks/05_costs.ipynb | 7 |
+| Retrieve at the user, 7 runs | `Retrieve at U: median ~1504 ms` | notebooks/05_costs.ipynb | 8 |
+| R2 at one server holding 10 items, 2 matching, 7 runs | `(10 items, 2 match): median ~1000 ms` | notebooks/05_costs.ipynb | 8 |
+| One key update round among 3 servers, 15 runs | `whole round, N = 3: median ~326 ms` | notebooks/05_costs.ipynb | 9 |
+| Share of Login time at the user spent in its 4 PRF chains | `Login at U: 4 PRF chains, share in chains ~97%` | notebooks/05_costs.ipynb | 10 |
+| What limits Login at a server | `Login at S_1: 0 PRF chains, share in chains 0%, limiter ML-DSA-44 verify (~81%)` | notebooks/05_costs.ipynb | 10 |
+| Failed checks over every timed run | `failures over all 270 checked runs: 0` | notebooks/05_costs.ipynb | 12 |
+
+### Communication cost (notebook 05)
+
+![Bytes sent per phase by direction](docs/figures/traffic.svg)
+
+**Figure 2.** Bytes each phase sends, split by direction, with `N = 3` servers. Payload sizes are exact. Drawn
+by `notebooks/05_costs.ipynb`, cell 13.
+
+Source: `notebooks/05_costs.ipynb`, cell 13.
+
+| phase | user to servers | servers to user | between servers | total |
+| --- | --- | --- | --- | --- |
+| Register | 181398 B | 344064 B | 0 B | 525462 B |
+| Login | 119612 B | 235648 B | 0 B | 355260 B |
+| Outsource (100 KB) | 106709 B | 0 B | 0 B | 106709 B |
+| Retrieve | 12645 B | 208568 B | 0 B | 221213 B |
+| Key update | 0 B | 0 B | 39264 B | 39264 B |
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Register traffic per direction | `Register: U -> S 181398 B, S -> U 344064 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
+| Login traffic per direction | `Login: U -> S 119612 B, S -> U 235648 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
+| Outsource traffic for a 100 KB document | `Outsource: U -> S 106709 B, S -> U 0 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
+| Retrieve traffic, 2 matching 100 KB documents | `Retrieve: U -> S 12645 B, S -> U 208568 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
+| Key update traffic between servers, N = 3 | `Key update: U -> S 0 B, S -> U 0 B, S -> S 39264 B` | notebooks/05_costs.ipynb | 11 |
+
+### Counter index (notebook 07)
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Counter index: label and entry sizes | `label 32 B + entry 108 B` | notebooks/07_counter_index.ipynb | 4 |
+| Counter index: Outsource request for item 1 | `= 2742 B with the user id` | notebooks/07_counter_index.ipynb | 4 |
+| Sealed counter table, one 1024-byte block | `sealed 1072 B` | notebooks/07_counter_index.ipynb | 5 |
+| Counter table upload to each server | `CounterTableUpload to each server: 3497 B` | notebooks/07_counter_index.ipynb | 5 |
+| Keywords found in any server's stored bytes | `{'invoice': [], 'medical': [], 'meeting': [], 'travel': []}` | notebooks/07_counter_index.ipynb | 7 |
+| Label search request for c_w = 3, to each server | `LabelSearchRequest, 2521 B` | notebooks/07_counter_index.ipynb | 9 |
+| File fetch request for one item | `FileFetchRequest for items [1], 2425 B` | notebooks/07_counter_index.ipynb | 12 |
+| Files recovered for medical, and lookups per server | `recovered items [1, 3, 6], equal to the originals; lookups per server [3, 3, 3]` | notebooks/07_counter_index.ipynb | 13 |
+| A kept search request replayed after a new upload | `replaying the kept request: hits per server [1, 1, 1], items [1, 3, 6]` | notebooks/07_counter_index.ipynb | 14 |
+| A new search after that upload | `4 labels, items [1, 3, 6, 8]` | notebooks/07_counter_index.ipynb | 14 |
+| Paper's scheme: a kept dsk tested on a later upload | `with the kept dsk: MATCH` | notebooks/07_counter_index.ipynb | 15 |
+| Counter table versions a new device gets at L4 | `versions returned [8, 8]` | notebooks/07_counter_index.ipynb | 16 |
+
+### Search time against storage size (notebook 08)
+
+![Search time at the slowest server against stored files, both schemes, N = 3, 5, 7](docs/figures/search_scaling.svg)
+
+**Figure 3.** Median search time at the slowest server, for the paper's scheme and the counter index, at 10^2
+to 10^5 stored files and `N = 3, 5, 7` servers, on log-log axes. Drawn by `notebooks/08_search_scaling.ipynb`, cell 7.
+
+Every value is the median of 5 runs with 3 matching files, one on each of `S_1` to `S_3`. "All servers" sums
+the time over the servers. "User" is the user's time for the whole search. The speed-up is the paper's slowest
+server divided by the counter index's.
+
+Source: `notebooks/08_search_scaling.ipynb`, cell 7.
+
+| N | files | paper: slowest server | index: slowest server | paper: all servers | index: all servers | paper: user | index: user | speed-up, slowest server |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 3 | 100 | 554 ms | 4.61 ms | 1.66 s | 13.7 ms | 2.21 s | 2.26 s | 120x |
+| 3 | 1,000 | 597 ms | 4.64 ms | 1.79 s | 13.9 ms | 2.26 s | 1.93 s | 129x |
+| 3 | 10,000 | 537 ms | 4.73 ms | 1.61 s | 14.1 ms | 1.96 s | 2.21 s | 113x |
+| 3 | 100,000 | 721 ms | 4.74 ms | 1.93 s | 14.1 ms | 1.98 s | 2.44 s | 152x |
+| 5 | 100 | 534 ms | 4.85 ms | 1.61 s | 24.0 ms | 2.14 s | 2.17 s | 110x |
+| 5 | 1,000 | 522 ms | 4.76 ms | 1.58 s | 23.6 ms | 2.08 s | 2.13 s | 110x |
+| 5 | 10,000 | 528 ms | 4.64 ms | 1.61 s | 22.9 ms | 2.06 s | 2.13 s | 114x |
+| 5 | 100,000 | 678 ms | 4.64 ms | 2.08 s | 23.0 ms | 2.33 s | 2.31 s | 146x |
+| 7 | 100 | 531 ms | 4.81 ms | 1.61 s | 33.3 ms | 2.13 s | 2.17 s | 111x |
+| 7 | 1,000 | 531 ms | 4.83 ms | 1.61 s | 33.2 ms | 2.14 s | 2.18 s | 110x |
+| 7 | 10,000 | 510 ms | 4.66 ms | 1.57 s | 32.2 ms | 2.03 s | 2.07 s | 109x |
+| 7 | 100,000 | 608 ms | 4.69 ms | 1.95 s | 32.6 ms | 2.34 s | 2.28 s | 130x |
+
+The paper's search time hardly grows with storage, because a failed AES-GCM tag check on a non-matching item
+is cheap. Most of its time at a server is the one lattice PRF evaluation it runs for each matching item. The
+counter index's server only looks labels up in a dictionary. The user's time is about the same in both schemes,
+because both run one PRF evaluation per matching file.
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| Kernel pinned to one performance core for the scaling runs | `kernel main thread affinity: [2]` | notebooks/08_search_scaling.ipynb | 1 |
+| Real Ct and entry sizes the filler copies | `[(4256, 108)] B` | notebooks/08_search_scaling.ipynb | 3 |
+| Crossover, N = 3 | `N = 3: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 5 | `N = 5: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 7 | `N = 7: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Lookups per server in every counter index run | `lookups per server in every counter index run: [3]` | notebooks/08_search_scaling.ipynb | 6 |
+| Failed checks over every scaling run | `failures over all 144 checked runs: 0` | notebooks/08_search_scaling.ipynb | 6 |
+
+### PARAM II offline guessing (notebook 06)
+
+![Residual of each password guess against one blinded login request, PARAM II and PARAM I](docs/figures/param_ii_residuals.svg)
+
+**Figure 4.** Residual of each of the dictionary's guesses against one blinded login request, on a log scale.
+At PARAM II the real password falls below the threshold and every wrong guess lies far above it. At PARAM I the
+real password is as far off as the wrong guesses. Drawn by `notebooks/06_param_ii_offline_guessing.ipynb`, cell 7.
+
+Source: `notebooks/06_param_ii_offline_guessing.ipynb`, cell 7.
+
+| parameter set | threshold tau | real password residual | smallest wrong-guess residual | largest wrong-guess residual | guesses matched |
+| --- | --- | --- | --- | --- | --- |
+| PARAM II, n = 595 | 1249 | 382 | 88243150 | 106898851 | sunshine1 |
+| PARAM I, n = 512 | 1159 | 96673162 | 87519736 | 105468868 | none |
+
+| Claim | Value | Notebook | Cell |
+| --- | --- | --- | --- |
+| PARAM II ring degree is odd | `n = 595 (odd: True)` | notebooks/06_param_ii_offline_guessing.ipynb | 1 |
+| Match threshold of the offline test at PARAM II | `match threshold tau = 1249` | notebooks/06_param_ii_offline_guessing.ipynb | 2 |
+| Residual of the real password at PARAM II | `true password residual: ~382` | notebooks/06_param_ii_offline_guessing.ipynb | 4 |
+| Smallest residual of a wrong guess at PARAM II | `smallest wrong-guess residual: ~88243150` | notebooks/06_param_ii_offline_guessing.ipynb | 4 |
+| Guesses matched at PARAM I | `matched guesses: []` | notebooks/06_param_ii_offline_guessing.ipynb | 5 |
 
 ## Known security gaps
 
@@ -198,93 +481,14 @@ fix needs a design the paper does not give.
 
 ## Numeric claims
 
-Cell `k` is the `k`-th code cell of the notebook, which is execution count `[k]` after a fresh run with
-`scripts/run_notebooks.py`. A value written `~x unit` changes between runs. The checker accepts a
-printed value within a factor of 2 of it.
+Every number in this README is printed by a notebook cell, named next to it, and
+`scripts/check_readme_claims.py` checks it against the saved outputs. The unit-test count in
+[Results](#results) is the one exception, and it names its command instead.
 
-| Claim | Value | Notebook | Cell |
-| --- | --- | --- | --- |
-| Table II modulus q = 2^28 - 57 | `q = 268435399` | notebooks/01_preliminaries.ipynb | 2 |
-| PARAM I ring degree | `n = 512` | notebooks/01_preliminaries.ipynb | 2 |
-| PARAM II ring degree | `n = 595` | notebooks/01_preliminaries.ipynb | 2 |
-| Gadget width, ceil(log2 q) | `ell = 28` | notebooks/01_preliminaries.ipynb | 2 |
-| Rounding modulus of the BP PRF | `p = 2` | notebooks/01_preliminaries.ipynb | 2 |
-| Standard deviation of chi_sigma | `sigma = 3.2` | notebooks/01_preliminaries.ipynb | 2 |
-| Bit length of PRF and TOPRF inputs | `L = 128` | notebooks/01_preliminaries.ipynb | 2 |
-| Size of each public a, a_0, a_1 | `57344 B` | notebooks/01_preliminaries.ipynb | 2 |
-| Random R_q products equal to an exact integer reference | `3/3` | notebooks/01_preliminaries.ipynb | 3 |
-| Output bits of one BP PRF evaluation | `14336 bits` | notebooks/01_preliminaries.ipynb | 5 |
-| Median time of one BP PRF evaluation, 7 runs | `over 7 runs: median ~0.6 s` | notebooks/01_preliminaries.ipynb | 6 |
-| Largest TOPRF noise coefficient 2e'' in one run | `max \|2e''\| = ~5000` | notebooks/01_preliminaries.ipynb | 10 |
-| q/4, the extractor's noise bound | `q/4 = 67108849` | notebooks/01_preliminaries.ipynb | 10 |
-| Size of K_u and of an HKDF output | `1792 B` | notebooks/01_preliminaries.ipynb | 11 |
-| Servers, threshold and attempt limit in notebook 02 | `N = 3, t = 2, mu = 14` | notebooks/02_register_login.ipynb | 2 |
-| TOPRF request to each server (user id and b) | `57349 B` | notebooks/02_register_login.ipynb | 4 |
-| Register TOPRF response from each server | `114688 B` | notebooks/02_register_login.ipynb | 4 |
-| Size of pk_u (ML-DSA-44 public key) | `1312 B` | notebooks/02_register_login.ipynb | 5 |
-| Register step 2 message (pk_u and hint) | `RegisterKeyMessage: 3109 B` | notebooks/02_register_login.ipynb | 5 |
-| Login L1 response from each server | `L1 response per server: 117792 B` | notebooks/02_register_login.ipynb | 6 |
-| Login L2 proof to each server | `L2 proof per server: 2457 B` | notebooks/02_register_login.ipynb | 6 |
-| Repeated correct logins with byte-identical K_u | `10/10 logins gave byte-identical K_u` | notebooks/02_register_login.ipynb | 10 |
-| Median time of one Login with 2 servers, 10 runs | `over 10 runs: median ~2.3 s` | notebooks/02_register_login.ipynb | 10 |
-| Attempt count at which S_2 refuses L1 | `mu_u = 14 reached the limit mu = 14` | notebooks/02_register_login.ipynb | 11 |
-| Size of the index ciphertext Ct | `Ct 4256 B` | notebooks/03_outsource_retrieve.ipynb | 4 |
-| Size of sig_Ct (ML-DSA-44 signature) | `sig_Ct 2420 B` | notebooks/03_outsource_retrieve.ipynb | 4 |
-| Retrieve request to each server (user id, dsk, sig_dsk) | `RetrieveRequest, 4217 B` | notebooks/03_outsource_retrieve.ipynb | 9 |
-| Time of R2 on all 3 servers, 7 stored items, 3 matches | `R2 on all 3 servers: ~1.4 s` | notebooks/03_outsource_retrieve.ipynb | 10 |
-| Items recovered for the keyword medical | `recovered items [1, 3, 6]` | notebooks/03_outsource_retrieve.ipynb | 12 |
-| Key update shares that pass step 4, N = 3 | `shares accepted: 9 of 9` | notebooks/04_server_key_update.ipynb | 6 |
-| Payload of one key update share at t = 2 (h, E(i, F_ji), sig_j) | `6544 B` | notebooks/04_server_key_update.ipynb | 5 |
-| Size of a key share k_i | `(2048 B)` | notebooks/04_server_key_update.ipynb | 4 |
-| Epochs after two key updates | `epochs: [2, 2, 2]` | notebooks/04_server_key_update.ipynb | 11 |
-| PARAM II ring degree is odd | `n = 595 (odd: True)` | notebooks/06_param_ii_offline_guessing.ipynb | 1 |
-| Match threshold of the offline test at PARAM II | `match threshold tau = 1249` | notebooks/06_param_ii_offline_guessing.ipynb | 2 |
-| Residual of the real password at PARAM II | `true password residual: ~344` | notebooks/06_param_ii_offline_guessing.ipynb | 4 |
-| Smallest residual of a wrong guess at PARAM II | `smallest wrong-guess residual: ~9.2e7` | notebooks/06_param_ii_offline_guessing.ipynb | 4 |
-| Guesses matched at PARAM I | `matched guesses: []` | notebooks/06_param_ii_offline_guessing.ipynb | 5 |
-| Kernel pinned to one performance core for the cost runs | `kernel main thread affinity: [2]` | notebooks/05_costs.ipynb | 1 |
-| Median time of one PRF chain a_x, 7 runs | `one PRF chain a_x: median ~490 ms` | notebooks/05_costs.ipynb | 3 |
-| Median time of one ML-DSA-44 signature, 101 runs | `ML-DSA-44 sign: median ~20 ms` | notebooks/05_costs.ipynb | 4 |
-| Register at the user, 7 runs | `Register at U: median ~1400 ms` | notebooks/05_costs.ipynb | 5 |
-| Login at the user, 7 runs | `Login at U: median ~1900 ms` | notebooks/05_costs.ipynb | 6 |
-| Outsource of a 100 KB document at the user, 7 runs | `at U: median ~1000 ms` | notebooks/05_costs.ipynb | 7 |
-| Retrieve at the user, 7 runs | `Retrieve at U: median ~1600 ms` | notebooks/05_costs.ipynb | 8 |
-| R2 at one server holding 10 items, 2 matching, 7 runs | `(10 items, 2 match): median ~1000 ms` | notebooks/05_costs.ipynb | 8 |
-| One key update round among 3 servers, 15 runs | `whole round, N = 3: median ~290 ms` | notebooks/05_costs.ipynb | 9 |
-| Share of Login time at the user spent in its 4 PRF chains | `Login at U: 4 PRF chains, share in chains ~97%` | notebooks/05_costs.ipynb | 10 |
-| What limits Login at a server | `Login at S_1: 0 PRF chains, share in chains 0%, limiter ML-DSA-44 verify (~80%)` | notebooks/05_costs.ipynb | 10 |
-| Register traffic per direction | `Register: U -> S 181398 B, S -> U 344064 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
-| Login traffic per direction | `Login: U -> S 119612 B, S -> U 235648 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
-| Outsource traffic for a 100 KB document | `Outsource: U -> S 106709 B, S -> U 0 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
-| Retrieve traffic, 2 matching 100 KB documents | `Retrieve: U -> S 12645 B, S -> U 208568 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
-| Key update traffic between servers, N = 3 | `Key update: U -> S 0 B, S -> U 0 B, S -> S 39264 B` | notebooks/05_costs.ipynb | 11 |
-| Failed checks over every timed run | `failures over all 270 checked runs: 0` | notebooks/05_costs.ipynb | 12 |
-| Counter index: label and entry sizes | `label 32 B + entry 108 B` | notebooks/07_counter_index.ipynb | 4 |
-| Counter index: Outsource request for item 1 | `= 2742 B with the user id` | notebooks/07_counter_index.ipynb | 4 |
-| Sealed counter table, one 1024-byte block | `sealed 1072 B` | notebooks/07_counter_index.ipynb | 5 |
-| Counter table upload to each server | `CounterTableUpload to each server: 3497 B` | notebooks/07_counter_index.ipynb | 5 |
-| Keywords found in any server's stored bytes | `{'invoice': [], 'medical': [], 'meeting': [], 'travel': []}` | notebooks/07_counter_index.ipynb | 7 |
-| Label search request for c_w = 3, to each server | `LabelSearchRequest, 2521 B` | notebooks/07_counter_index.ipynb | 9 |
-| File fetch request for one item | `FileFetchRequest for items [1], 2425 B` | notebooks/07_counter_index.ipynb | 12 |
-| Files recovered for medical, and lookups per server | `recovered items [1, 3, 6], equal to the originals; lookups per server [3, 3, 3]` | notebooks/07_counter_index.ipynb | 13 |
-| A kept search request replayed after a new upload | `replaying the kept request: hits per server [1, 1, 1], items [1, 3, 6]` | notebooks/07_counter_index.ipynb | 14 |
-| A new search after that upload | `4 labels, items [1, 3, 6, 8]` | notebooks/07_counter_index.ipynb | 14 |
-| Paper's scheme: a kept dsk tested on a later upload | `with the kept dsk: MATCH` | notebooks/07_counter_index.ipynb | 15 |
-| Counter table versions a new device gets at L4 | `versions returned [8, 8]` | notebooks/07_counter_index.ipynb | 16 |
-| Kernel pinned to one performance core for the scaling runs | `kernel main thread affinity: [2]` | notebooks/08_search_scaling.ipynb | 1 |
-| Real Ct and entry sizes the filler copies | `[(4256, 108)] B` | notebooks/08_search_scaling.ipynb | 3 |
-| Paper's slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, paper: slowest server median ~1.11 s` | notebooks/08_search_scaling.ipynb | 4 |
-| Counter index slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, counter index: slowest server median ~7.36 ms` | notebooks/08_search_scaling.ipynb | 4 |
-| Paper's sum over servers, N = 3, 10^4 files, 5 runs | `N = 3, 10000 files, paper: slowest server median 976 ms, sum over servers median ~2.80 s` | notebooks/08_search_scaling.ipynb | 4 |
-| Paper's slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median ~1.19 s` | notebooks/08_search_scaling.ipynb | 4 |
-| Paper's sum over servers, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median ~3.29 s` | notebooks/08_search_scaling.ipynb | 4 |
-| Counter index slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median ~6.82 ms` | notebooks/08_search_scaling.ipynb | 4 |
-| User's time, paper, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median 3.29 s, U median ~3.56 s` | notebooks/08_search_scaling.ipynb | 4 |
-| User's time, counter index, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median 6.82 ms, sum over servers median 18.0 ms, U median ~3.96 s` | notebooks/08_search_scaling.ipynb | 4 |
-| Paper's slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, paper: slowest server median ~961 ms` | notebooks/08_search_scaling.ipynb | 4 |
-| Counter index slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, counter index: slowest server median ~6.95 ms` | notebooks/08_search_scaling.ipynb | 4 |
-| Crossover, N = 3 | `N = 3: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
-| Crossover, N = 5 | `N = 5: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
-| Crossover, N = 7 | `N = 7: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
-| Lookups per server in every counter index run | `lookups per server in every counter index run: [3]` | notebooks/08_search_scaling.ipynb | 6 |
-| Failed checks over every scaling run | `failures over all 144 checked runs: 0` | notebooks/08_search_scaling.ipynb | 6 |
+- **Claim tables** have the header `| Claim | Value | Notebook | Cell |`. Cell `k` is the `k`-th code cell of
+  the notebook, which is execution count `[k]` after a fresh run with `scripts/run_notebooks.py`. A value
+  written `~x unit` changes between runs, and the checker accepts a printed value within a factor of 2 of it.
+  Every other value must appear exactly.
+- **Tables after a `Source:` line** are pasted unchanged from that cell's output, and the checker finds every
+  row there. They hold one run's numbers, so after rerunning a notebook, paste its new tables.
+- **Figures** are drawn by the cell named in their caption, from the same run as the tables next to them.

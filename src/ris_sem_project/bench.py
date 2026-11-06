@@ -12,8 +12,11 @@ numpy, BPPRF and the table printer are imported inside the functions that need t
 starts its thread pools.
 """
 
+import importlib.metadata
 import os
+import platform
 import resource
+import sys
 import statistics
 import time
 from collections import defaultdict
@@ -107,6 +110,50 @@ def cpu_model() -> str:
     except OSError:
         pass
     return "unknown"
+
+
+def memory_total_gib() -> float | None:
+    """MemTotal from /proc/meminfo in GiB, None when unreadable."""
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                return int(line.split()[1]) / 2**20
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def system_summary() -> str:
+    """The machine and software a notebook ran on, one fact per line."""
+    memory = memory_total_gib()
+    versions = []
+    for package in ("numpy", "cryptography", "dilithium-py", "ipykernel", "nbclient", "matplotlib"):
+        try:
+            versions.append(f"{package} {importlib.metadata.version(package)}")
+        except importlib.metadata.PackageNotFoundError:
+            versions.append(f"{package} missing")
+    return "\n".join([
+        f"CPU: {cpu_model()}, {os.cpu_count()} logical CPUs",
+        f"memory: {memory:.1f} GiB" if memory is not None else "memory: unreadable",
+        f"OS: {platform.system()} {platform.release()} ({platform.machine()})",
+        f"Python: {sys.version.split()[0]}",
+        f"packages: {', '.join(versions)}",
+    ])
+
+
+def kernel_usage() -> str:
+    """What running this notebook cost: wall time since this process started, its CPU time and its
+    peak resident memory. Called in a notebook's last cell, the process is that notebook's kernel."""
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    cpu_seconds = usage.ru_utime + usage.ru_stime
+    peak_mib = usage.ru_maxrss / 1024
+    try:
+        start_ticks = int(Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19])
+        wall = float(Path("/proc/uptime").read_text().split()[0]) - start_ticks / os.sysconf("SC_CLK_TCK")
+        wall_text = f"{wall:.0f} s wall"
+    except (OSError, ValueError, IndexError):
+        wall_text = "wall time unreadable"
+    return f"kernel: {wall_text}, {cpu_seconds:.0f} s CPU, peak memory {peak_mib:.0f} MiB, on {cpu_model()}"
 
 
 def sibling_cpus(cpu: int = PIN_CPU) -> tuple[int, ...]:

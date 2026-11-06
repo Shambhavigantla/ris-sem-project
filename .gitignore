@@ -5,3 +5,5 @@ skills-lock.json
 # Python
 __pycache__/
 *.pyc
+# Status of a running full notebook run
+run-status.log

@@ -54,6 +54,13 @@ def table(headers: Sequence[str], rows: Iterable[Sequence[object]]) -> str:
     return "\n".join(lines)
 
 
+def markdown_table(headers: Sequence[str], rows: Iterable[Sequence[object]]) -> str:
+    """A Markdown table, ready to paste into README.md, whose rows the README checker finds verbatim."""
+    lines = ["| " + " | ".join(map(str, headers)) + " |", "| " + " | ".join("---" for _ in headers) + " |"]
+    lines += ["| " + " | ".join(str(cell).replace("|", "\\|") for cell in row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
 SCAN_HEADERS = ("item", "Dec(dsk, Ct)", "rho", "v (from Ct)", "Ver sig_C", "PRF(dsk, rho)", "v == PRF", "outcome")
 """Column names for scan_row."""
 
