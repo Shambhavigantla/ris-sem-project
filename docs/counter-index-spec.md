@@ -105,9 +105,11 @@ key update, so `K_w`, the labels and the counter table stay valid.
 
 **Login, extra step L4.** After L3 succeeds on the contacted servers, the user asks each of them for its stored
 `CounterTableUpload`. The user keeps the uploads whose signature verifies under `pk_u` and whose sealed table
-opens under `k_ctr`, and takes the one with the highest version. If no upload passes both checks, the table is
-empty at version 0.
-The server serves the table only to a user who has passed L3 in the current session.
+opens under `k_ctr` with the same version inside as the signed `version`, and takes the one with the highest
+version. If no upload passes these checks, the table is empty at version 0. A user object that logs in again
+keeps its own table if that is newer than every upload.
+The server serves the table only to a user who has passed L3 in the current session. A new `new_session` for
+the user ends the old session, so the user must pass L3 again.
 
 **Outsource, replaces O1 and O2.**
 
@@ -119,8 +121,11 @@ The server serves the table only to a user who has passed L3 in the current sess
    evicts nothing.
 4. Only after `S_i` accepts does the user set `c_w = j` and upload the new counter table to all `N` servers.
 5. If `S_i` answers `DUPLICATE_LABEL`, an earlier upload stored the row but its table upload did not
-   finish. The user sets `c_w = j`, and retries once from step 1 with the next label. Search still finds the
-   earlier row, because it asks for every label from 1 to `c_w`.
+   finish. The user sets `c_w = j` without uploading the table, and retries once from step 1 with the next label.
+   Search still finds the earlier row, because it asks for every label from 1 to `c_w`.
+
+   A server checks only its own rows. If the earlier row is on another server, `S_i` stores the new row under
+   the same label. Both rows are genuine, so R3 keeps every valid row and not one per label.
 
 **Retrieve, replaces R1 to R3.**
 
@@ -130,8 +135,11 @@ The server serves the table only to a user who has passed L3 in the current sess
 2. **R2.** Each server verifies the signature and looks up each label in the user's dictionary. It does
    `c_w` hash-table lookups and scans nothing. It returns `LabelSearchResponse(server_id, hits)`, where
    `hits` holds the `(label, entry)` pairs it found.
-3. **R3.** The user opens each entry with `k_ptr` and checks that the label inside equals the label it was
-   returned for. It drops entries that fail, and records the item id and the file hash from each entry it keeps.
+3. **R3.** The user drops a row whose label is not one it asked for in R1. Otherwise a server could answer a
+   search with a row of another keyword, whose entry would open correctly. The user opens each remaining entry
+   with `k_ptr` and checks that the label inside equals the label it was returned for. It drops entries that
+   fail, and records the item id and the file hash from each entry it keeps. A row that several servers return
+   is kept once.
 4. **R4.** The user sends `FileFetchRequest(user_id, item_ids, signature)` to each server that returned hits,
    with `signature = sign(sk_u, pack(*[int_bytes(i) for i in item_ids]))`. The server returns
    `FileFetchResponse(server_id, files)`, where `files` holds the `(item_id, data_ct)` pairs.
@@ -189,11 +197,13 @@ state. They are `index: dict[UserID, dict[bytes, bytes]]`, `files: dict[UserID, 
 `CounterTableUpload`, and the set of users that passed L3 this session. It also adds these methods:
 
 - `indexed_outsource_store(request) -> StoreOutcome`. This is Outsource step 3. `StoreOutcome` is an enum with
-  `STORED`, `BAD_SIGNATURE`, `DUPLICATE_LABEL` and `FULL`, so the user can tell a duplicate label (step 5)
-  from the other rejections.
+  `STORED`, `MALFORMED`, `BAD_SIGNATURE`, `DUPLICATE_LABEL` and `FULL`, so the user can tell a duplicate label
+  (step 5) from the other rejections. `MALFORMED` covers a label that is not 32 bytes and an item id that does
+  not fit in 4 bytes, which the signature check cannot encode.
 - `store_counter_table(upload) -> bool`. Accept only a valid signature and a higher version.
-- `counter_table(user_id) -> CounterTableUpload | None`. Serve only a user who passed L3. Record L3 by overriding
-  `login_verify` to remember an accepted user, then calling the parent.
+- `counter_table(user_id) -> CounterTableUpload | None`. Serve only a user who passed L3, else raise
+  `ProtocolAbort`. Record L3 by overriding `login_verify`: call the parent, then remember an accepted user and
+  forget a rejected one. Override `new_session` to forget the user too.
 - `label_search(request) -> LabelSearch`. `LabelSearch` is a frozen record holding the `LabelSearchResponse` and
   the number of lookups done, for the notebooks. It is the same idea as `RetrieveScan`. Raise `ProtocolAbort` on a
   bad signature.
@@ -211,10 +221,15 @@ methods:
 - `indexed_outsource(keyword, data, item_id) -> IndexedOutsourceRequest`, which does not advance the counter
 - `confirm_outsource(keyword) -> CounterTableUpload`, which advances the counter after the server accepted, and
   returns the upload for all servers
+- `skip_label(keyword) -> CounterTable`, which advances the counter without an upload, for Outsource step 5
 - `label_search_request(keyword) -> LabelSearchRequest | None`, which returns `None` when `c_w = 0`
 - `open_hits(keyword, responses) -> list[OpenedHit]`, for R3
 - `fetch_request(item_ids) -> FileFetchRequest`
 - `open_files(hits, responses) -> list[bytes]`, which checks each hash and decrypts
+
+The session also exposes `counter_table` and `index_keys` as read-only properties for the notebooks. It caches
+each label for the session, as `QPASEUser` caches each `K_w`, so an upload's label is not computed again when the
+user searches in the same session.
 
 ### `protocol.py`
 
@@ -227,7 +242,8 @@ methods:
 ### `bench.py`
 
 Add the filler helpers that notebook 08 needs (see [Measure it](#measure-it)), with docstrings that say they write
-straight into server state and skip Outsource.
+straight into server state and skip Outsource: `fill_qpase_storage`, `fill_counter_index`, and `spread_evenly`,
+which splits a storage size over the servers.
 
 ## Tests in `tests/test_counter_index.py`
 
@@ -310,7 +326,8 @@ cheap, so the gap may only show at the larger sizes. Report the measured crossov
 
 Each unit ends with the full test suite green. Open one pull request per unit.
 
-1. **`counter_index.py` and its unit tests.** These are pure functions, so this unit depends on no other unit.
+1. **`counter_index.py` and its unit tests in `tests/test_counter_index_functions.py`.** These are pure functions,
+   so this unit depends on no other unit.
 2. **Wire messages, `CounterIndexServer`, `CounterIndexUser`, the `protocol.py` functions and
    `tests/test_counter_index.py`.** This depends on unit 1. One person should own it, because the files depend on
    each other.

@@ -14,6 +14,11 @@ and 6. Where the paper is incomplete or inconsistent, the choice made is listed 
 
 The design and every decision behind it are in `docs/implementation-plan.md`.
 
+The repository also implements our proposed improvement, the
+[counter-based search index](#counter-based-search-index). It replaces the per-file search tags with an
+encrypted dictionary, so that search becomes table lookups and later uploads stay hidden from earlier searches.
+Its specification is `docs/counter-index-spec.md`. Both schemes run on the same servers.
+
 ## Module map
 
 Everything lives in `src/ris_sem_project/`. The notebooks only call these modules.
@@ -33,7 +38,10 @@ Everything lives in `src/ris_sem_project/`. The notebooks only call these module
 - `primitives/linear_hash.py` is the linear hash `H(x) = A_H x mod q` behind the key-update commitments (decision 6).
 - `index.py` builds the searchable index `Ct` of one document (O1) and runs the check of R2 and R3.
 - `parties/` has the abstract `User`, `Server` and adversary classes, the wire messages in `types.py`, and the concrete `QPASEUser` and `QPASEServer`, including the server key update steps.
-- `protocol.py` runs whole phases (DKG, Register, Login, Outsource, Retrieve, server key update) and returns a record of every message.
+- `counter_index.py` has the pure functions of the counter index: labels, the index keys, sealing and opening entries, and the counter table.
+- `parties/counter_index_server.py` and `parties/counter_index_user.py` have `CounterIndexServer` and `CounterIndexUser`. They extend `QPASEServer` and `QPASEUser` with the counter index.
+- `protocol.py` runs whole phases (DKG, Register, Login, Outsource, Retrieve, server key update) and returns a record of every message. `ci_login`, `ci_outsource` and `ci_retrieve` run the counter index's phases.
+- `bench.py` has the measuring code of notebooks 05 and 08, and the filler helpers that write straight into server state for notebook 08.
 - `root_attack.py` is the PARAM II offline password test shown in notebook 06.
 - `display.py` formats values for the notebooks and computes nothing.
 
@@ -45,6 +53,63 @@ The notebooks in `notebooks/` show each phase with the data that crosses the wir
 - `04_server_key_update.ipynb` refreshes every server's key share and shows users are unaffected (Sec. IV-F, Lemma 3).
 - `05_costs.ipynb` measures our own computation and communication costs per phase.
 - `06_param_ii_offline_guessing.ipynb` shows why the demos do not use PARAM II.
+- `07_counter_index.ipynb` stores the files of notebook 03 with the counter index, searches them, and shows forward privacy next to the paper's scheme.
+- `08_search_scaling.ipynb` measures search time against storage size for both schemes with `N = 3, 5, 7` servers.
+
+## Counter-based search index
+
+This is our improvement, not part of the paper. `docs/counter-index-spec.md` specifies it and makes every
+design decision.
+
+**What it changes.** In the paper's Retrieve the user sends `dsk = HKDF(K_u, w)` to every server, and each
+server tries `dsk` on every item it stores. That has two costs. A server can keep `dsk` and test every later
+upload with it, so the scheme has no forward privacy. And the search work grows with the total storage, not
+with the number of matches. The counter index keeps `K_w = HKDF(K_u, w)` (the old `dsk`) on the user's device.
+The `j`-th file under `w` gets the label `label(w, j)`, the first 256 bits of `PRF(K_w, j)`. A server stores one
+row `label -> entry` per file, where `entry = Enc(k_ptr, (label, i, SHA3-256(C)))`. The user keeps `c_w`, the
+number of files under `w`, in a counter table. The servers hold a signed copy sealed under `k_ctr`, so another
+device gets the same counters at Login.
+
+**Phases.** Register, Login L1 to L3 and the server key update are unchanged. `K_u` survives a key update,
+so the labels and the counter table stay valid.
+
+- **Login L4.** The user fetches the sealed counter table from the contacted servers and keeps the
+  newest one whose signature verifies and that opens under `k_ctr`.
+- **Outsource.** The user sends the row for `j = c_w + 1` and the file `C` to one server. After that server
+  stores it, the user sets `c_w = j` and uploads the new counter table to all `N` servers.
+- **Retrieve.** The user sends the labels for `j = 1..c_w` to all `N` servers (R1). Each server does `c_w`
+  dictionary lookups (R2). The user opens the entries it gets back (R3) and fetches the files by item id
+  from the servers that held them (R4). It then checks each file's hash and decrypts it (R5). The server
+  cannot follow an encrypted pointer, so Retrieve takes two round trips.
+
+**What a server learns.**
+
+| Event | Server learns |
+| --- | --- |
+| Outsource | A new row (random-looking label and entry), the file `C` under its item id, and the counter table's size in 1024-byte blocks and its version |
+| Search | `c_w` labels, which of them hit on this server, and which files the user then fetches |
+| Repeated search for the same `w` | The same labels again, so it can link the two searches (search pattern) |
+| Upload after a search | Nothing that links the new row to the old labels. It never had `K_w`, so it cannot compute `label(w, c_w + 1)` |
+
+This gives forward privacy. It does not give backward privacy, and this codebase has no deletion.
+Notebook 07 shows a server replaying a kept search request after a new upload: the request finds only the old
+files. In the paper's scheme a kept `dsk` matches the new item.
+
+**Costs.** At a server, R2 is one ML-DSA-44 verification and `c_w` dictionary lookups, with no PRF and no
+decryption, and R4 is one more verification. At the user, each new label is one lattice PRF chain, so the first
+search for `w` in a session costs `c_w` chains plus one for `K_w`. Labels are cached for the session. An upload
+costs the user what the paper's Outsource does: one chain (the label, in place of `v`) and two ML-DSA-44
+signatures (the row and the counter table, in place of `sig_C` and `sig_Ct`). It also sends the counter table
+to all `N` servers.
+
+**Measured search time** (notebook 08, PARAM I, `t = 2`, 3 matching files, one per server on `S_1` to `S_3`).
+At every storage size from 10^2 to 10^5 files and every `N` in 3, 5, 7, the counter index's slowest server
+took a few milliseconds and the paper's about a second, so the counter index searched faster at every measured
+size. There is no crossover. The paper's R2 grew little with storage: with `N = 3` its sum over servers went
+from about 2.8 s at 10^4 files to about 3.3 s at 10^5. Most of its time is the one PRF chain a server runs for
+each matching item, plus the ML-DSA-44 checks. A failed AES-GCM tag check on a non-matching item is cheap,
+as the spec expected. The user's time was about the same in both schemes, a few seconds, because both run one
+PRF chain per matching file (`v` in the paper, the label here) plus one for `dsk` or `K_w`.
 
 ## Server key update
 
@@ -194,3 +259,32 @@ printed value within a factor of 2 of it.
 | Retrieve traffic, 2 matching 100 KB documents | `Retrieve: U -> S 12645 B, S -> U 208568 B, S -> S 0 B` | notebooks/05_costs.ipynb | 11 |
 | Key update traffic between servers, N = 3 | `Key update: U -> S 0 B, S -> U 0 B, S -> S 39264 B` | notebooks/05_costs.ipynb | 11 |
 | Failed checks over every timed run | `failures over all 270 checked runs: 0` | notebooks/05_costs.ipynb | 12 |
+| Counter index: label and entry sizes | `label 32 B + entry 108 B` | notebooks/07_counter_index.ipynb | 4 |
+| Counter index: Outsource request for item 1 | `= 2742 B with the user id` | notebooks/07_counter_index.ipynb | 4 |
+| Sealed counter table, one 1024-byte block | `sealed 1072 B` | notebooks/07_counter_index.ipynb | 5 |
+| Counter table upload to each server | `CounterTableUpload to each server: 3497 B` | notebooks/07_counter_index.ipynb | 5 |
+| Keywords found in any server's stored bytes | `{'invoice': [], 'medical': [], 'meeting': [], 'travel': []}` | notebooks/07_counter_index.ipynb | 7 |
+| Label search request for c_w = 3, to each server | `LabelSearchRequest, 2521 B` | notebooks/07_counter_index.ipynb | 9 |
+| File fetch request for one item | `FileFetchRequest for items [1], 2425 B` | notebooks/07_counter_index.ipynb | 12 |
+| Files recovered for medical, and lookups per server | `recovered items [1, 3, 6], equal to the originals; lookups per server [3, 3, 3]` | notebooks/07_counter_index.ipynb | 13 |
+| A kept search request replayed after a new upload | `replaying the kept request: hits per server [1, 1, 1], items [1, 3, 6]` | notebooks/07_counter_index.ipynb | 14 |
+| A new search after that upload | `4 labels, items [1, 3, 6, 8]` | notebooks/07_counter_index.ipynb | 14 |
+| Paper's scheme: a kept dsk tested on a later upload | `with the kept dsk: MATCH` | notebooks/07_counter_index.ipynb | 15 |
+| Counter table versions a new device gets at L4 | `versions returned [8, 8]` | notebooks/07_counter_index.ipynb | 16 |
+| Kernel pinned to one performance core for the scaling runs | `kernel main thread affinity: [2]` | notebooks/08_search_scaling.ipynb | 1 |
+| Real Ct and entry sizes the filler copies | `[(4256, 108)] B` | notebooks/08_search_scaling.ipynb | 3 |
+| Paper's slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, paper: slowest server median ~1.11 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 3, 10^2 files, 5 runs | `N = 3, 100 files, counter index: slowest server median ~7.36 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's sum over servers, N = 3, 10^4 files, 5 runs | `N = 3, 10000 files, paper: slowest server median 976 ms, sum over servers median ~2.80 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median ~1.19 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's sum over servers, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median ~3.29 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median ~6.82 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| User's time, paper, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, paper: slowest server median 1.19 s, sum over servers median 3.29 s, U median ~3.56 s` | notebooks/08_search_scaling.ipynb | 4 |
+| User's time, counter index, N = 3, 10^5 files, 5 runs | `N = 3, 100000 files, counter index: slowest server median 6.82 ms, sum over servers median 18.0 ms, U median ~3.96 s` | notebooks/08_search_scaling.ipynb | 4 |
+| Paper's slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, paper: slowest server median ~961 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Counter index slowest server, N = 7, 10^5 files, 5 runs | `N = 7, 100000 files, counter index: slowest server median ~6.95 ms` | notebooks/08_search_scaling.ipynb | 4 |
+| Crossover, N = 3 | `N = 3: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 5 | `N = 5: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Crossover, N = 7 | `N = 7: the counter index searched faster (sum over servers) at every measured size` | notebooks/08_search_scaling.ipynb | 5 |
+| Lookups per server in every counter index run | `lookups per server in every counter index run: [3]` | notebooks/08_search_scaling.ipynb | 6 |
+| Failed checks over every scaling run | `failures over all 144 checked runs: 0` | notebooks/08_search_scaling.ipynb | 6 |

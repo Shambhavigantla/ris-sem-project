@@ -216,3 +216,74 @@ class KeyUpdateShare:
     """E(i, F_ji): S_j's update share for S_i, encrypted to S_i."""
     signature: bytes
     """sig_j <- Sign(sk_j, (id, F_v^(omega)))."""
+
+
+# --------------------------------------------------------------------------
+# Counter-based search index (docs/counter-index-spec.md)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IndexedOutsourceRequest:
+    """U -> S_i, counter-index Outsource step 2: one index row and the file C."""
+
+    user_id: UserID
+    label: bytes
+    """label(w, j) for j = c_w + 1: 256 bits of PRF(K_w, j)."""
+    entry: bytes
+    """Enc(k_ptr, (label, i, SHA3-256(C)))."""
+    item_id: int
+    """i: the id C is stored under."""
+    data_ct: bytes
+    """C = Enc(K_u, d), as in the paper's Outsource."""
+    signature: bytes
+    """Sign(sk_u, (label, entry, i, C))."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CounterTableUpload:
+    """U -> every S: the counter table {w: c_w}, sealed under k_ctr and padded to 1024-byte blocks."""
+
+    user_id: UserID
+    version: int
+    """Starts at 1 and goes up by 1 with every change. A server keeps only a higher version."""
+    sealed: bytes
+    """Enc(k_ctr, (version, table, zero padding))."""
+    signature: bytes
+    """Sign(sk_u, (ID_u, version, sealed))."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class LabelSearchRequest:
+    """U -> every S, counter-index Retrieve R1: the labels for j = 1..c_w of one keyword."""
+
+    user_id: UserID
+    labels: tuple[bytes, ...]
+    signature: bytes
+    """Sign(sk_u, labels)."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class LabelSearchResponse:
+    """S_i -> U, counter-index Retrieve R2: the (label, entry) rows S_i holds among the requested labels."""
+
+    server_id: ServerID
+    hits: tuple[tuple[bytes, bytes], ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FileFetchRequest:
+    """U -> S_i, counter-index Retrieve R4: the item ids of the files U wants from S_i."""
+
+    user_id: UserID
+    item_ids: tuple[int, ...]
+    signature: bytes
+    """Sign(sk_u, item ids)."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FileFetchResponse:
+    """S_i -> U, counter-index Retrieve R4: (i, C) for each requested id S_i holds."""
+
+    server_id: ServerID
+    files: tuple[tuple[int, bytes], ...] = field(default_factory=tuple)

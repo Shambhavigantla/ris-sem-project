@@ -182,5 +182,38 @@ class FormatTest(unittest.TestCase):
         self.assertEqual(bench.sizes_text([5, 6]), "5 / 6")
 
 
+class FillerTest(unittest.TestCase):
+    """The notebook 08 filler helpers, on stand-in servers that have only the state they write."""
+
+    def test_qpase_filler_appends_items_of_the_given_size_that_no_key_opens(self):
+        from ris_sem_project.primitives.symmetric import decrypt
+
+        server = types.SimpleNamespace(storage={"alice": ["real item"]})
+        total = bench.fill_qpase_storage(server, "alice", 5, 4256, 10_000, b"C")
+        items = server.storage["alice"]
+        self.assertEqual(total, 6)
+        self.assertEqual(items[0], "real item")
+        self.assertEqual([item.item_id for item in items[1:]], list(range(10_000, 10_005)))
+        self.assertEqual({len(item.index_ct) for item in items[1:]}, {4256})
+        self.assertEqual(len({item.index_ct for item in items[1:]}), 5)
+        self.assertIsNone(decrypt(bytes(32), items[1].index_ct))
+        with self.assertRaises(ValueError):
+            bench.fill_qpase_storage(server, "alice", 1, 27, 0, b"C")
+
+    def test_counter_index_filler_adds_rows_of_the_given_entry_size(self):
+        server = types.SimpleNamespace(index={})
+        self.assertEqual(bench.fill_counter_index(server, "alice", 50, 108), 50)
+        self.assertEqual(bench.fill_counter_index(server, "alice", 7, 108), 57)
+        rows = server.index["alice"]
+        self.assertEqual({len(label) for label in rows}, {32})
+        self.assertEqual({len(entry) for entry in rows.values()}, {108})
+
+    def test_spread_evenly(self):
+        self.assertEqual(bench.spread_evenly(97, 3), [33, 32, 32])
+        self.assertEqual(bench.spread_evenly(0, 2), [0, 0])
+        with self.assertRaises(ValueError):
+            bench.spread_evenly(5, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
