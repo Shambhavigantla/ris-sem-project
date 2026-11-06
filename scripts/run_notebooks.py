@@ -18,6 +18,11 @@ from nbclient.exceptions import CellExecutionError
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def shown(path: Path) -> Path:
+    """path relative to the repository root when inside it, else as given (a copy run elsewhere)."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
 def run(path: Path) -> bool:
     nb = nbformat.read(path, as_version=4)
     client = NotebookClient(
@@ -31,11 +36,11 @@ def run(path: Path) -> bool:
         client.execute()
         ok = True
     except CellExecutionError as err:
-        print(f"FAIL {path.relative_to(ROOT)}\n{err}", file=sys.stderr)
+        print(f"FAIL {shown(path)}\n{err}", file=sys.stderr)
         ok = False
     nbformat.write(nb, path)
     if ok:
-        print(f"ok   {path.relative_to(ROOT)} ({time.perf_counter() - start:.1f} s)")
+        print(f"ok   {shown(path)} ({time.perf_counter() - start:.1f} s)")
     return ok
 
 
