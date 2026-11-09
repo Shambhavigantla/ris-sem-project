@@ -1,0 +1,70 @@
+\section{Introduction}
+\label{sec:introduction}
+
+\subsection{Background}
+
+Users keep more and more of their data with cloud providers, and much of it is sensitive: medical records,
+invoices, travel bookings. A user who encrypts such files before upload protects them from the provider,
+but loses the ability to search them on the server. Downloading and decrypting everything for each search
+costs bandwidth and time. Searchable symmetric encryption (SSE) closes this gap. The user attaches an
+encrypted index to each file, and the server can find the files that match a keyword without learning the
+keyword or the contents~\cite{song2000practical,curtmola2006sse}.
+
+SSE needs a long, uniformly random key, and that key has to be present on every device the user searches
+from. People cannot remember such keys, so in practice the key is stored and copied between devices, and
+each copy is one more place it can leak. A password is what people actually remember. A line of work on
+password-protected secret sharing lets a user recover a strong key from a password with the help of several
+servers, none of which learns the password or the key~\cite{bagherzandi2011pps,jarecki2014round,
+jarecki2016highly,jarecki2017toppss,das2022dpase}. Chen et al.\ combined this idea with searchable encryption
+in password-authenticated searchable encryption (PASE)~\cite{chen2021pase}, and Huang et al.\ built a
+public-key relative, password-authenticated keyword search~\cite{huang2017paks}. These schemes rest
+on the discrete-logarithm problem, which Shor's algorithm solves on a quantum computer~\cite{shor1994}.
+Lattice-based schemes avoid that attack~\cite{regev2009lwe,roy2021pps,jiang2024qpause}. QPASE is the first
+PASE scheme built on lattices~\cite{jiang2024qpase}: the user remembers only an identity and a password, a
+threshold of $t$ out of $N$ servers turns the password into a user key $\Ku$, and every other key is derived
+from $\Ku$.
+
+\subsection{Problem statement}
+
+The QPASE paper specifies the scheme and reports measurements of a C++ implementation, but it does not include
+that implementation. A reader who wants to check the scheme's claims, or to build on it, has to implement it
+first. That raised three questions for this project:
+\begin{enumerate}
+  \item Can QPASE be built from the paper alone, and where does the paper leave a choice open?
+  \item What does the scheme cost in time and traffic when it is built that way, and does the paper's design
+        hold up when each step runs?
+  \item The paper's search sends a permanent per-keyword key to every server, and each server tests that key
+        against every file it stores. Can search keep the key on the user's device and touch only the matching
+        files?
+\end{enumerate}
+
+\subsection{Contributions}
+
+\begin{itemize}
+  \item \textbf{A working QPASE.} We implemented every phase of the paper in Python: the distributed key
+        generation, the lattice threshold oblivious pseudorandom function (TOPRF) with its robust extractor,
+        Register, Login, Outsource, Retrieve and the server key update (\cref{sec:qpase,sec:implementation}).
+        Eight notebooks show each phase with the data that crosses the wire, and \UnitTests{} unit tests check
+        the behaviour.
+  \item \textbf{A record of every gap in the paper.} Where the paper is incomplete or internally inconsistent,
+        we state what it says, what we chose and why (\cref{sec:decisions}).
+  \item \textbf{Measured costs on one machine.} We time every building block and every phase at the user and at
+        a server, explain each phase time by its count of lattice PRF evaluations, measure exact message sizes,
+        and compare both with the paper's own figures (\cref{sec:evaluation-qpase}).
+  \item \textbf{Two security findings.} Run in the ring $\mathbb{Z}_q[X]/(X^{595}+1)$, our reading of the
+        scheme text, the paper's 128-bit parameter set lets a single server test password guesses offline; the
+        paper's Fig.~1 uses plain LWE, so we do not claim the paper's scheme is broken. The linear commitments of
+        our key-update instantiation reveal every update share to an eavesdropper (\cref{sec:findings}).
+  \item \textbf{A counter-based search index.} We propose and evaluate an index that keeps the search key on
+        the user's device, answers a search with dictionary lookups, and hides later uploads from earlier
+        searches (\cref{sec:counter-index,sec:counter-analysis,sec:counter-evaluation}).
+\end{itemize}
+
+\subsection{Organisation}
+
+\Cref{sec:background} reviews related work and the building blocks. \Cref{sec:qpase} describes QPASE as the
+paper specifies it, and \cref{sec:implementation} describes our implementation and the choices it required.
+\Cref{sec:evaluation-qpase} evaluates the implementation and reports the two findings.
+\Cref{sec:counter-index} proposes the counter-based index, \cref{sec:counter-analysis} analyses its security,
+and \cref{sec:counter-evaluation} measures it. \Cref{sec:comparison} compares the schemes, and
+\cref{sec:conclusion} concludes. \Cref{app:reproducibility} explains how to reproduce every number in this report.

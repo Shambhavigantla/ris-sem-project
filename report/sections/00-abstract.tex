@@ -1,0 +1,25 @@
+\begin{abstract}
+Searchable encryption lets a user store encrypted files on cloud servers and still search them by keyword.
+Most schemes need a long secret key on every device the user owns. Password-authenticated searchable
+encryption (PASE) replaces that key with a password, and QPASE, by Jiang and Wang, rebuilds PASE on
+lattices so that it resists quantum attacks~\cite{jiang2024qpase}. In this project we implemented QPASE in
+Python, following the paper phase by phase: the distributed key generation, the lattice threshold oblivious
+pseudorandom function with its robust extractor, Register, Login, Outsource, Retrieve and the server key
+update. Where the paper is incomplete or inconsistent, we record the choice we made. Our implementation passes
+\UnitTests{} unit tests, and on one machine it recovers the same user key in \LoginsIdentical{} logins and returns
+exactly the matching documents for a real keyword query. Building it uncovered two gaps. Run in the ring
+$\mathbb{Z}_q[X]/(X^{595}+1)$, which is our reading of the scheme text, the paper's 128-bit parameter set lets
+one server test password guesses offline. The linear commitments of our key-update instantiation reveal every
+update share. We then propose a counter-based
+search index that keeps the search key on the user's device. Servers answer a search with dictionary lookups
+instead of a scan, and a stored search request cannot find files uploaded after it (forward privacy). At the
+slowest server it searched \ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster than the paper's scheme for
+$10^2$ to $10^5$ stored files.
+
+\todo{Revise this abstract once Sections~\ref{sec:counter-index} to \ref{sec:conclusion} are written, so it
+matches what they claim.}
+
+\medskip
+\noindent\textbf{Keywords:} searchable encryption, password authentication, lattice cryptography, oblivious
+pseudorandom function, forward privacy, post-quantum security.
+\end{abstract}

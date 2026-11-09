@@ -1,0 +1,91 @@
+\begin{thebibliography}{10}
+
+\bibitem{jiang2024qpase}
+J.~Jiang and D.~Wang, ``{QPASE}: Quantum-resistant password-authenticated searchable encryption for cloud storage,'' {\em IEEE Transactions on Information Forensics and Security}, vol.~19, pp.~4231--4244, 2024.
+
+\bibitem{song2000practical}
+D.~X. Song, D.~Wagner, and A.~Perrig, ``Practical techniques for searches on encrypted data,'' in {\em Proc. IEEE Symposium on Security and Privacy}, pp.~44--55, 2000.
+
+\bibitem{curtmola2006sse}
+R.~Curtmola, J.~Garay, S.~Kamara, and R.~Ostrovsky, ``Searchable symmetric encryption: Improved definitions and efficient constructions,'' in {\em Proc. ACM Conference on Computer and Communications Security (CCS)}, pp.~79--88, 2006.
+
+\bibitem{bagherzandi2011pps}
+A.~Bagherzandi, S.~Jarecki, N.~Saxena, and Y.~Lu, ``Password-protected secret sharing,'' in {\em Proc. 18th ACM Conference on Computer and Communications Security (CCS)}, pp.~433--444, 2011.
+
+\bibitem{jarecki2014round}
+S.~Jarecki, A.~Kiayias, and H.~Krawczyk, ``Round-optimal password-protected secret sharing and {T-PAKE} in the password-only model,'' in {\em Proc. 20th International Conference on the Theory and Application of Cryptology and Information Security (ASIACRYPT)}, pp.~233--253, 2014.
+
+\bibitem{jarecki2016highly}
+S.~Jarecki, A.~Kiayias, H.~Krawczyk, and J.~Xu, ``Highly-efficient and composable password-protected secret sharing (or: How to protect your {Bitcoin} wallet online),'' in {\em Proc. IEEE European Symposium on Security and Privacy}, pp.~276--291, 2016.
+
+\bibitem{jarecki2017toppss}
+S.~Jarecki, A.~Kiayias, H.~Krawczyk, and J.~Xu, ``{TOPPSS}: Cost-minimal password-protected secret sharing based on threshold {OPRF},'' in {\em Proc. Applied Cryptography and Network Security (ACNS)}, pp.~39--58, 2017.
+
+\bibitem{das2022dpase}
+P.~Das, J.~Hesse, and A.~Lehmann, ``{DPaSE}: Distributed password-authenticated symmetric-key encryption, or how to get many keys from one password,'' in {\em Proc. ACM Asia Conference on Computer and Communications Security (AsiaCCS)}, pp.~682--696, 2022.
+
+\bibitem{chen2021pase}
+L.~Chen, K.~Huang, M.~Manulis, and V.~Sekar, ``Password-authenticated searchable encryption,'' {\em International Journal of Information Security}, vol.~20, no.~5, pp.~675--693, 2021.
+
+\bibitem{huang2017paks}
+K.~Huang, M.~Manulis, and L.~Chen, ``Password authenticated keyword search,'' in {\em Proc. IEEE Symposium on Privacy-Aware Computing (PAC)}, pp.~129--140, 2017.
+
+\bibitem{shor1994}
+P.~Shor, ``Algorithms for quantum computation: Discrete logarithms and factoring,'' in {\em Proc. 35th Annual Symposium on Foundations of Computer Science (FOCS)}, pp.~124--134, 1994.
+
+\bibitem{regev2009lwe}
+O.~Regev, ``On lattices, learning with errors, random linear codes, and cryptography,'' {\em Journal of the ACM}, vol.~56, no.~6, pp.~1--40, 2009.
+
+\bibitem{roy2021pps}
+P.~Roy, S.~Dutta, W.~Susilo, and R.~Safavi-Naini, ``Password protected secret sharing from lattices,'' in {\em Proc. Applied Cryptography and Network Security (ACNS)}, pp.~442--459, 2021.
+
+\bibitem{jiang2024qpause}
+J.~Jiang, D.~Wang, and G.~Zhang, ``{QPause}: Quantum-resistant password-protected data outsourcing for cloud storage,'' {\em IEEE Transactions on Services Computing}, 2024.
+\newblock early access.
+
+\bibitem{ballard2005conjunctive}
+L.~Ballard, S.~Kamara, and F.~Monrose, ``Achieving efficient conjunctive keyword searches over encrypted data,'' in {\em Proc. International Conference on Information and Communications Security (ICICS)}, pp.~414--426, 2005.
+
+\bibitem{jiang2022sso}
+J.~Jiang, D.~Wang, G.~Zhang, and Z.~Chen, ``Quantum-resistant password-based threshold single-sign-on authentication with updatable server private key,'' in {\em Computer Security, ESORICS}, pp.~295--316, 2022.
+
+\bibitem{lyubashevsky2010ring}
+V.~Lyubashevsky, C.~Peikert, and O.~Regev, ``On ideal lattices and learning with errors over rings,'' in {\em Advances in Cryptology, EUROCRYPT 2010}, vol.~6110 of {\em LNCS}, pp.~1--23, 2010.
+
+\bibitem{banerjee2014prf}
+A.~Banerjee and C.~Peikert, ``New and improved key-homomorphic pseudorandom functions,'' in {\em Advances in Cryptology, CRYPTO 2014}, pp.~353--370, 2014.
+
+\bibitem{alwen2013lwr}
+J.~Alwen, S.~Krenn, K.~Pietrzak, and D.~Wichs, ``Learning with rounding, revisited: New reduction, properties and applications,'' in {\em Advances in Cryptology, CRYPTO 2013}, pp.~57--74, 2013.
+
+\bibitem{albrecht2021oprf}
+M.~Albrecht, A.~Davidson, A.~Deo, and N.~P. Smart, ``Round-optimal verifiable oblivious pseudorandom functions from ideal lattices,'' in {\em Proc. Public-Key Cryptography (PKC)}, pp.~261--289, 2021.
+
+\bibitem{ding2012kex}
+J.~Ding, X.~Xie, and X.~Lin, ``A simple provably secure key exchange scheme based on the learning with errors problem.'' Cryptology ePrint Archive, Paper 2012/688, 2012.
+
+\bibitem{bendlin2013share}
+R.~Bendlin, S.~Krehbiel, and C.~Peikert, ``How to share a lattice trapdoor: Threshold protocols for signatures and {(H)IBE},'' in {\em Proc. Applied Cryptography and Network Security (ACNS)}, pp.~218--236, 2013.
+
+\bibitem{krawczyk2010hkdf}
+H.~Krawczyk, ``Cryptographic extraction and key derivation: The {HKDF} scheme,'' in {\em Advances in Cryptology, CRYPTO 2010}, pp.~631--648, 2010.
+
+\bibitem{bai2021dilithium}
+S.~Bai, L.~Ducas, and E.~Kiltz, ``{CRYSTALS-Dilithium}: Algorithm specifications and supporting documentation (version 3.1),'' 2021.
+
+\bibitem{fips204}
+{National Institute of Standards and Technology}, ``Module-lattice-based digital signature standard,'' Federal Information Processing Standards Publication FIPS 204, NIST, 2024.
+
+\bibitem{grover1996}
+L.~K. Grover, ``A fast quantum mechanical algorithm for database search,'' in {\em Proc. 28th Annual ACM Symposium on Theory of Computing (STOC)}, pp.~212--219, 1996.
+
+\bibitem{dworkin2007gcm}
+M.~Dworkin, ``Recommendation for block cipher modes of operation: {Galois/Counter Mode (GCM)} and {GMAC},'' Special Publication 800-38D, NIST, 2007.
+
+\bibitem{bellare2000bpr}
+M.~Bellare, D.~Pointcheval, and P.~Rogaway, ``Authenticated key exchange secure against dictionary attacks,'' in {\em Advances in Cryptology, EUROCRYPT 2000}, pp.~139--155, 2000.
+
+\bibitem{wang2017zipf}
+D.~Wang, H.~Cheng, P.~Wang, X.~Huang, and G.~Jian, ``Zipf's law in passwords,'' {\em IEEE Transactions on Information Forensics and Security}, vol.~12, no.~11, pp.~2776--2791, 2017.
+
+\end{thebibliography}

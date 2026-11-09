@@ -1,0 +1,75 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,longtable,multirow}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{xcolor}
+\usepackage[shortlabels]{enumitem}
+\usepackage[most]{tcolorbox}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+\graphicspath{{../docs/figures/}}
+\setlength{\parskip}{0.35em}
+\setlist{itemsep=0.2em,topsep=0.3em}
+
+\input{generated/numbers}
+
+% Authors. Person B replaces the two placeholders (see handoff/handoff.pdf).
+\newcommand{\AuthorA}{Iman Kalyan Chakraborty}
+\newcommand{\RollA}{2026801003}
+\newcommand{\AuthorB}{[Partner name]}
+\newcommand{\RollB}{[Roll number]}
+
+\newtheorem{definition}{Definition}
+\newcommand{\Rq}{R_q}
+\newcommand{\Ku}{K_u}
+\newcommand{\dsk}{\mathit{dsk}}
+
+% A protocol phase, written as numbered steps.
+\newtcolorbox{protocol}[1]{enhanced, breakable, colback=white, colframe=black!55, boxrule=0.5pt,
+  arc=1pt, left=6pt, right=6pt, top=4pt, bottom=4pt, fonttitle=\bfseries\small, coltitle=black,
+  colbacktitle=black!7, title={#1}}
+
+% Work left for Person B. report/tools/check_report.py --final fails while any remain.
+\newcommand{\todo}[1]{\par\noindent\fcolorbox{red!70!black}{red!4}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{%
+  \small\color{red!45!black}\textbf{To do (Person B).} #1}}\par}
+
+\title{\vspace{-1.2em}\textbf{Quantum-Resistant Password-Authenticated Searchable Encryption in Practice}\\[0.4em]
+  \large A reproduction of QPASE and a forward-private counter-based search index}
+\author{%
+  \begin{tabular}{c@{\hspace{3em}}c}
+    \AuthorA & \AuthorB \\
+    Roll No.\ \RollA & Roll No.\ \RollB
+  \end{tabular}\\[0.8em]
+  \normalsize RIS Course Project Report}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\input{sections/00-abstract}
+
+\input{sections/01-introduction}
+\input{sections/02-background}
+\input{sections/03-qpase}
+\input{sections/04-implementation}
+\input{sections/05-evaluation-qpase}
+\input{sections/06-counter-index}
+\input{sections/07-counter-index-analysis}
+\input{sections/08-counter-index-evaluation}
+\input{sections/09-comparison}
+\input{sections/10-conclusion}
+
+\bibliographystyle{ieeetr}
+\bibliography{references}
+
+\appendix
+\input{sections/appendix-reproducibility}
+
+\end{document}

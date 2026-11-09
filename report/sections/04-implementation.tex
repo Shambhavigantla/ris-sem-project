@@ -1,0 +1,136 @@
+\section{Implementation}
+\label{sec:implementation}
+
+\subsection{Scope and structure}
+
+We implemented QPASE in Python~\MachinePython{} with three libraries: numpy for the ring arithmetic,
+\texttt{cryptography} for AES-256-GCM, and \texttt{dilithium-py} for ML-DSA-44. The implementation covers Setup,
+the distributed key generation, Register, Login, Outsource, single-keyword Retrieve and the server key update.
+The notebooks call the library and add no protocol code of their own. \Cref{tab:modules} lists the modules.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Modules of the implementation, all under \texttt{src/ris\_sem\_project/}.}
+\label{tab:modules}
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+\textbf{Module} & \textbf{Responsibility} \\
+\midrule
+\texttt{params.py} & the Table II parameter sets and Setup; parses $pp$ once \\
+\texttt{primitives/ring.py} & exact arithmetic in $\Rq$ \\
+\texttt{primitives/sampling.py} & uniform sampling and the discrete Gaussian $\chi_\sigma$ \\
+\texttt{primitives/gadget.py}, \texttt{bp\_prf.py} & $G^{-1}$ and the Banerjee--Peikert PRF of \cref{eq:bp-prf} \\
+\texttt{primitives/extractor.py} & Ding's hint $S$ and extractor $E$ \\
+\texttt{primitives/secret\_sharing.py} & Shamir sharing over $\Rq$, Lagrange coefficients, the key generation \\
+\texttt{primitives/toprf.py} & blinding, evaluation and the combination of \cref{eq:toprf-combine} \\
+\texttt{primitives/hkdf.py}, \texttt{prf.py} & HKDF and PRF built on the lattice PRF \\
+\texttt{primitives/signature.py}, \texttt{symmetric.py} & ML-DSA-44 and AES-256-GCM wrappers \\
+\texttt{primitives/linear\_hash.py} & the linear hash $H$ of the key-update commitments \\
+\texttt{index.py} & builds the index ciphertext $Ct$ and runs the check of R2 and R3 \\
+\texttt{parties/} & the user and server classes and the wire messages \\
+\texttt{protocol.py} & runs each phase and records every message it moves \\
+\texttt{root\_attack.py} & the PARAM~II offline password test of \cref{sec:param-ii} \\
+\texttt{bench.py}, \texttt{figures.py} & measurement code and the figures; no protocol logic \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Every value that crosses between parties is an immutable record whose cryptographic fields are bytes. The user
+and server classes check those bytes when they arrive and trust their own internal types afterwards. The same
+function checks an index entry at the server in step R2 and at the user in step R3, so the two sides cannot
+drift apart. The user object holds one session state at a time (a TOPRF in flight, a Register waiting to send its
+key, or a logged-in session), which makes a call in the wrong order an error rather than a silent mistake.
+
+\subsection{Exact ring arithmetic}
+
+The modulus $q = 2^{28} - 57$ is not suitable for the number-theoretic transform, since $q - 1 = 2 \cdot 134217699$
+has no large power of two as a factor. We multiply in $\Rq$ with a twisted complex FFT instead. Coefficient $i$ of
+each operand is multiplied by $\psi^i$ with $\psi = e^{i\pi/n}$, which turns the wrap-around $X^n = -1$ into an
+ordinary cyclic convolution. To keep the floating-point result exact, each operand is split into two 14-bit limbs.
+Every limb product then has integer coefficients below $n \cdot 2^{29}$, well inside the 53-bit precision of a
+double, so rounding recovers each coefficient exactly. This works for any $n$, including the odd $n = 595$ of
+PARAM~II. The tests compare the product with a schoolbook implementation, and notebook~01 finds
+\RingProductsExact{} random products equal to an exact integer reference.
+
+\subsection{Where the paper is incomplete}
+\label{sec:decisions}
+
+The paper leaves several values open and contradicts itself in a few places. \Cref{tab:decisions} records each
+gap and the choice we made. The implementation plan in \texttt{docs/implementation-plan.md} gives the full
+reasoning.
+
+{\small
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.2\linewidth}>{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedright\arraybackslash}p{0.38\linewidth}}
+\caption{Gaps in the paper and our choices.}
+\label{tab:decisions}\\
+\toprule
+\textbf{Topic} & \textbf{What the paper says} & \textbf{Our choice} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Topic} & \textbf{What the paper says} & \textbf{Our choice} \\
+\midrule
+\endhead
+Ring or matrices & Fig.~1 uses LWE matrices; Section~II-B, Section~IV-A and Fig.~2 use a vector in
+$\Rq^{1\times\ell}$. & The ring $\Rq = \mathbb{Z}_q[X]/(X^n+1)$. The matrix version of the PRF would need a
+$14336 \times 14336$ matrix product per step at $n = 512$. \\
+TOPRF combination & The proof of Theorem~1 subtracts $2r\sum_i \lambda_i e_i$ but then defines $e''$ with
+$+r\sum_i \lambda_i e_i$. & The sign the algebra gives, $-r$ in
+\cref{eq:toprf-combine}. \\
+Lagrange coefficients & Not discussed. The noise $e''$ is small only if every $\lambda_i$ is an integer. & Only
+server subsets whose coefficients are integers. The subset $\{1, \dots, t\}$ always qualifies; $\{1, 3\}$ with
+$t = 2$ does not and is refused. \\
+Key sizes & The key generation leaves the distribution of the contributions open. & Contributions,
+$r$ and $e$ drawn from $\chi_\sigma$, so $K$ stays small as the TOPRF requires. \\
+Extractor hint & Fig.~2 computes the hint from $vk_i$, a value unrelated to $F$. & The user computes
+$\sigma = S(F)$ at Register; every server stores it and returns it at Login. Two logins then differ by an even,
+small amount, and $\Ku$ repeats. \\
+Message rounding & Fig.~2 rounds $b$, $b_{k_i}$ and $vk_i$ to $\mathbb{Z}_p$; Fig.~1 and Fig.~5 send the same
+messages unrounded. & Unrounded messages, as in Fig.~1 and Fig.~5, with the even noise of Fig.~2. The difference
+between two logins then stays even and small, which the extractor needs. \\
+Extractor formula & Definition~8 prints $E(x, \sigma) = (x + \sigma)(q-1)/2 \bmod 2$. & Ding et al.'s form
+$E(x, \sigma) = \big((x + \sigma \frac{q-1}{2}) \bmod q\big) \bmod 2$, for which the robustness property of
+Definition~8 holds. \\
+Sharing degree & Definition 11 uses degree $t$, so $t + 1$ servers reconstruct, but Login contacts $t$. &
+Degree $t - 1$, so any $t$ servers suffice. \\
+Key-update check & $H(F_{ji}) = \sum_k i^k H(\alpha_k)$ needs a linear $H$, and the update weights the shares by
+$\lambda_{i,j}$. & $H(x) = A_H x \bmod q$ with $A_H$ expanded from SHAKE256, and $k'_i = k_i + \sum_j F_{ji}$,
+which keeps $K$ unchanged. \\
+Secure channels & Assumed between servers. & AES-256-GCM under a key per server pair, and an ML-DSA-44 key
+per server for the share signatures. \\
+Open values & $p$, $\sigma$, the encryption mode and the Dilithium level are not fixed. Section~V sets
+$L = \kappa$ but not how the password becomes $L$ bits. & $p = \ParamP$, $\sigma = \ParamSigma$,
+$L = \kappa = \ParamL$ with $x$ the first $L$ bits of SHA3-256 of the password, AES-256-GCM and ML-DSA-44. \\
+Meaning of $\sigma$ & The text calls it the standard deviation; the printed density makes it a width. & The
+standard deviation, as the text says. \\
+HKDF and PRF & HKDF puts the lattice PRF into Krawczyk's extract-then-expand framework (Section~II-C). & Extract and expand both evaluate
+the lattice PRF. The Dilithium seed and the AES key also come from HKDF of $\Ku$. \\
+Authorisation & L3 ``allows'' the user to upload and search. & Outsource and Retrieve are authorised by
+$\sigma_{Ct}$ and $\sigma_{\dsk}$. Retrieve reaches all $N$ servers but Login only $t$, so an L3 gate would lock
+the other servers out. \\
+Attempt counter & L1 increments $\mu_u$ on every attempt; only the key update resets it. & As printed. A user
+therefore gets $\mu$ logins per epoch in total, not $\mu$ failed ones. \\
+Multiple keywords & Section IV-G sketches it outside the main protocol. & Left out; queries take one keyword. \\
+\bottomrule
+\end{longtable}
+}
+
+The sampler for $\chi_\sigma$ and the extractor are not constant-time. That is acceptable for a study of the
+scheme, but a deployment would need constant-time versions.
+
+\subsection{How we checked the implementation}
+
+We checked the implementation at three levels.
+\begin{itemize}
+  \item \textbf{Unit tests.} \UnitTests{} tests check behaviour that a caller can observe: exact ring products
+        against a schoolbook reference, $\Ku$ identical across logins and server subsets, wrong passwords and
+        tampered messages rejected, documents recovered byte for byte, and the master key unchanged by a key
+        update.
+  \item \textbf{Notebooks.} Eight notebooks run each phase with real data and print every message. Each ends with
+        assertion cells, so a notebook that finishes without an error means the property it demonstrates held.
+  \item \textbf{One run, one machine.} Every number in \cref{sec:evaluation-qpase,sec:counter-evaluation} comes
+        from one run of all eight notebooks on the machine of \cref{tab:machine}. A script checks each number that
+        the repository's README quotes against the notebook cell that printed it, and the numbers in this report
+        are generated from the same cells (\cref{app:reproducibility}).
+\end{itemize}
