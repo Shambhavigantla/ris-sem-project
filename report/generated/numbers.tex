@@ -68,6 +68,15 @@
 \newcommand{\ScalingChecks}{144}% notebook 08, cell 6: timed scaling runs whose result was checked
 \newcommand{\ScalingFailures}{0}% notebook 08, cell 6: failed checks over the scaling runs
 \newcommand{\ScalingLookups}{[3]}% notebook 08, cell 6: lookups per server in every run
+\newcommand{\CiRecoveredItems}{[1, 3, 6]}% notebook 07, cell 13: items the counter index recovers for medical
+\newcommand{\CiRTwoAllServers}{15 ms}% notebook 07, cell 10: time of the label search on all 3 servers
+\newcommand{\ScalingPaperThreeTenThousand}{537 ms}% notebook 08, cell 7: paper slowest server, N = 3, 10^4 files
+\newcommand{\ScalingPaperThreeHundredThousand}{721 ms}% notebook 08, cell 7: paper slowest server, N = 3, 10^5 files
+\newcommand{\ScalingIndexSumThree}{13.7 ms}% notebook 08, cell 7: counter index, all servers, N = 3, 10^2 files
+\newcommand{\ScalingIndexSumSeven}{33.3 ms}% notebook 08, cell 7: counter index, all servers, N = 7, 10^2 files
+\newcommand{\ScalingPaperSumThree}{1.66 s}% notebook 08, cell 7: paper, all servers, N = 3, 10^2 files
+\newcommand{\ScalingSumSpeedupThree}{120.6}% notebook 08, cell 5: speed-up over all servers, N = 3, 10^2 files
+\newcommand{\ScalingSumSpeedupSeven}{48.4}% notebook 08, cell 5: speed-up over all servers, N = 7, 10^2 files
 \newcommand{\CostRegisterUser}{1.39 s}% notebook 05, cell 13: median of RegisterUser in notebook 05
 \newcommand{\CostRegisterServer}{1.19 ms}% notebook 05, cell 13: median of RegisterServer in notebook 05
 \newcommand{\CostLoginUser}{1.90 s}% notebook 05, cell 13: median of LoginUser in notebook 05
@@ -109,6 +118,10 @@
 \newcommand{\ScalingSpeedupMin}{109}% notebook 08, cell 7 (derived from the table): smallest speed-up at the slowest server
 \newcommand{\ScalingSpeedupMax}{152}% notebook 08, cell 7 (derived from the table): largest speed-up at the slowest server
 \newcommand{\ScalingSpeedupMedian}{114}% notebook 08, cell 7 (derived from the table): median speed-up at the slowest server
+\newcommand{\ScalingUserPaperMin}{1.96 s}% notebook 08, cell 7 (derived from the table): fastest paper user median over the grid
+\newcommand{\ScalingUserPaperMax}{2.34 s}% notebook 08, cell 7 (derived from the table): slowest paper user median over the grid
+\newcommand{\ScalingUserIndexMin}{1.93 s}% notebook 08, cell 7 (derived from the table): fastest counter-index user median over the grid
+\newcommand{\ScalingUserIndexMax}{2.44 s}% notebook 08, cell 7 (derived from the table): slowest counter-index user median over the grid
 \newcommand{\RatioRegisterUser}{1,400}% notebook 05, cell 13, over the paper's Table IV: our RegisterUser median divided by the paper's
 \newcommand{\RatioLoginUser}{3,000}% notebook 05, cell 13, over the paper's Table IV: our LoginUser median divided by the paper's
 \newcommand{\RatioOutsourceUser}{62}% notebook 05, cell 13, over the paper's Table IV: our OutsourceUser median divided by the paper's

@@ -12,12 +12,11 @@ $\mathbb{Z}_q[X]/(X^{595}+1)$, which is our reading of the scheme text, the pape
 one server test password guesses offline. The linear commitments of our key-update instantiation reveal every
 update share. We then propose a counter-based
 search index that keeps the search key on the user's device. Servers answer a search with dictionary lookups
-instead of a scan, and a stored search request cannot find files uploaded after it (forward privacy). At the
-slowest server it searched \ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster than the paper's scheme for
-$10^2$ to $10^5$ stored files.
-
-\todo{Revise this abstract once Sections~\ref{sec:counter-index} to \ref{sec:conclusion} are written, so it
-matches what they claim.}
+instead of a scan, and a stored search request cannot find files uploaded after it (forward privacy). The index
+adds no new primitive. At the slowest server it searched \ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster
+than the paper's scheme for $10^2$ to $10^5$ stored files, with no crossover. Most of the gain comes from removing
+the server's lattice PRF evaluation for each matching file, not from removing the scan. The user's search cost is
+the same in both schemes, and the index costs a second round trip and a counter table kept on the servers.
 
 \medskip
 \noindent\textbf{Keywords:} searchable encryption, password authentication, lattice cryptography, oblivious

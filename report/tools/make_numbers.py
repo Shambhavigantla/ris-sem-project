@@ -123,6 +123,15 @@ NUMBERS = [
     Number("ScalingChecks", "08", 6, r"failures over all (\d+) checked runs", "timed scaling runs whose result was checked"),
     Number("ScalingFailures", "08", 6, r"failures over all \d+ checked runs: (\d+)", "failed checks over the scaling runs"),
     Number("ScalingLookups", "08", 6, r"lookups per server in every counter index run: (\[[^\]]*\])", "lookups per server in every run"),
+    Number("CiRecoveredItems", "07", 13, r"recovered items (\[[^\]]*\])", "items the counter index recovers for medical"),
+    Number("CiRTwoAllServers", "07", 10, r"R2 on all \d+ servers: (\S+ m?s)", "time of the label search on all 3 servers"),
+    Number("ScalingPaperThreeTenThousand", "08", 7, r"^\| 3 \| 10,000 \| (\S+ m?s) \|", "paper slowest server, N = 3, 10^4 files"),
+    Number("ScalingPaperThreeHundredThousand", "08", 7, r"^\| 3 \| 100,000 \| (\S+ m?s) \|", "paper slowest server, N = 3, 10^5 files"),
+    Number("ScalingIndexSumThree", "08", 7, r"^\| 3 \| 100 \|(?: [^|]+ \|){3} (\S+ m?s) \|", "counter index, all servers, N = 3, 10^2 files"),
+    Number("ScalingIndexSumSeven", "08", 7, r"^\| 7 \| 100 \|(?: [^|]+ \|){3} (\S+ m?s) \|", "counter index, all servers, N = 7, 10^2 files"),
+    Number("ScalingPaperSumThree", "08", 7, r"^\| 3 \| 100 \|(?: [^|]+ \|){2} (\S+ m?s) \|", "paper, all servers, N = 3, 10^2 files"),
+    Number("ScalingSumSpeedupThree", "08", 5, r"^3\s+100\s+\S+\s+(\S+)$", "speed-up over all servers, N = 3, 10^2 files"),
+    Number("ScalingSumSpeedupSeven", "08", 5, r"^7\s+100\s+\S+\s+(\S+)$", "speed-up over all servers, N = 7, 10^2 files"),
 ]
 PHASE_ROWS = [
     ("RegisterUser", "Register", "user"), ("RegisterServer", "Register", r"one server \(S_1\)"),
@@ -224,7 +233,10 @@ def derived(scaling: list[list[str]]) -> list[tuple[str, str, str]]:
     paper = [seconds(r[2]) for r in body]
     index = [seconds(r[3]) for r in body]
     speedup = [int(r[8].rstrip("x")) for r in body]
+    paper_user = [seconds(r[6]) for r in body]
+    index_user = [seconds(r[7]) for r in body]
     ms = lambda v: f"{v * 1e3:.3g} ms"
+    s = lambda v: f"{v:.3g} s"
     return [
         ("ScalingPaperMin", ms(min(paper)), "fastest paper slowest-server median over the grid"),
         ("ScalingPaperMax", ms(max(paper)), "slowest paper slowest-server median over the grid"),
@@ -233,6 +245,10 @@ def derived(scaling: list[list[str]]) -> list[tuple[str, str, str]]:
         ("ScalingSpeedupMin", str(min(speedup)), "smallest speed-up at the slowest server"),
         ("ScalingSpeedupMax", str(max(speedup)), "largest speed-up at the slowest server"),
         ("ScalingSpeedupMedian", str(round(statistics.median(speedup))), "median speed-up at the slowest server"),
+        ("ScalingUserPaperMin", s(min(paper_user)), "fastest paper user median over the grid"),
+        ("ScalingUserPaperMax", s(max(paper_user)), "slowest paper user median over the grid"),
+        ("ScalingUserIndexMin", s(min(index_user)), "fastest counter-index user median over the grid"),
+        ("ScalingUserIndexMax", s(max(index_user)), "slowest counter-index user median over the grid"),
     ]
 
 

@@ -1,4 +1,95 @@
 \section{Comparative Study}
 \label{sec:comparison}
 
-\todo{Write this section (handoff, Section~3.4): the paper's scheme against the counter index, and QPASE against related password-based schemes.}
+We compare the schemes in two ways. First we set the paper's search against the counter index, using our own
+measurements. Then we place QPASE among related password-based schemes, using the paper's own comparison.
+
+\subsection{QPASE against the counter index}
+
+\Cref{tab:qpase-vs-ci} compares the two schemes property by property. Both use the same Register, Login, key
+update and file encryption, so the table covers only search and what it needs.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{The paper's search against the counter index. Sizes come from notebooks~03 and~07, and times from
+notebook~08 over all settings of \cref{tab:search-scaling}.}
+\label{tab:qpase-vs-ci}
+\begin{tabularx}{\linewidth}{lXX}
+\toprule
+\textbf{Property} & \textbf{QPASE} & \textbf{Counter index} \\
+\midrule
+Search key leaves the device & yes, $\dsk$ goes to every server & no, only labels leave \\
+Server work per search & tries $\dsk$ on every stored item, one PRF chain per match & $c_w$ lookups and one
+signature check \\
+Slowest server per search & \ScalingPaperMin{} to \ScalingPaperMax & \ScalingIndexMin{} to \ScalingIndexMax \\
+Forward privacy & no, a kept $\dsk$ matches later items & yes, old labels miss later rows \\
+What a server learns & the search key, so it can test any item; the search pattern; which items match & the
+labels; the search pattern; which rows hit and which files are fetched \\
+Round trips per search & 1 & 2 \\
+Index storage per file & $Ct$, \SizeCt & label and entry, \CiLabelBytes{} + \CiEntryBytes \\
+Extra storage per user & none & sealed counter table on every server, \CiSealedBytes{} for the four keywords of
+notebook~07 \\
+Search request to each server & \SizeRetrieveRequest, fixed & \CiSearchRequestBytes{} at $c_w = 3$, plus
+\CiLabelBytes{} per extra label \\
+Extra traffic & none & counter table upload of \CiUploadBytes{} to each server per file, and a download at Login \\
+User's PRF chains per search & $1 + c_w$ & $1 + c_w$ \\
+User's time per search & \ScalingUserPaperMin{} to \ScalingUserPaperMax & \ScalingUserIndexMin{} to
+\ScalingUserIndexMax \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The counter index wins on the server side. Its search key stays on the device, it gives forward privacy, and its
+slowest server searched \ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster in our runs. Its index row is
+also much smaller than the paper's $Ct$. It pays for this with a second round trip, a counter table to store and
+upload, and a request that grows with $c_w$. Both schemes leak the search pattern. Both also show the server which
+files a search returns: QPASE when the server finds the matches at R2, and the counter index when the user fetches
+them at R4. For the user, a search costs the same in both schemes, because both run $1 + c_w$ PRF chains.
+
+\subsection{QPASE against related password-based schemes}
+
+\Cref{tab:related} reproduces Table~V of the paper~\cite{jiang2024qpase}. It compares QPASE with earlier
+password-protected secret sharing schemes and with PASE. The counter index changes only Outsource and Retrieve, so
+it keeps every property in QPASE's row.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{QPASE against related password-based schemes, from Table~V of the paper~\cite{jiang2024qpase}. UR is
+uniformly random, Zipf is a Zipf distribution, and -- means not considered. HE is homomorphic encryption and FHE
+fully homomorphic encryption. The computation overhead counts exponentiations $T_{exe}$, the most expensive
+operation, at the server and the user.}
+\label{tab:related}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+\textbf{Scheme} & \textbf{Threshold} & \textbf{Passwords} & \textbf{Model} & \textbf{Technique} &
+\textbf{Quantum security} & \textbf{Data retrieval} & \textbf{Rounds} & \textbf{Server / user} \\
+\midrule
+Bagherzandi et al.~\cite{bagherzandi2011pps} & $(t, N)$ & UR & ROM & HE & no & no & 2 & $16 / 33\,T_{exe}$ \\
+Camenisch et al.~\cite{camenisch2012pass} & $(2, 2)$ & -- & UC & HE & no & no & 1 & $26 / 19\,T_{exe}$ \\
+Jarecki et al.~\cite{jarecki2014round} & $(t, N)$ & UR & ROM & OPRF & no & no & 1 & $4 / 11\,T_{exe}$ \\
+Yi et al.~\cite{yi2015tpass} & $(t, N)$ & UR & UC & HE & no & no & 1 & $12 / 7\,T_{exe}$ \\
+Jarecki et al.~\cite{jarecki2016highly} & $(t, N)$ & UR & UC & OPRF & no & no & 1 & $1 / 4\,T_{exe}$ \\
+Jarecki et al.~\cite{jarecki2017toppss} & $(t, N)$ & UR & UC & OPRF & no & no & 1 & $1 / 2\,T_{exe}$ \\
+Das et al.~\cite{das2022dpase} & $(N, N)$ & UR & UC & OPRF & no & no & 2 & $4 / 10\,T_{exe}$ \\
+Chen et al.\ (PASE)~\cite{chen2021pase} & $(2, 2)$ & UR & ROM & HE & no & yes & 1 & $8 / 3\,T_{exe}$ \\
+Roy et al.~\cite{roy2021pps} & $(t, N)$ & UR & ROM & FHE & yes & no & 1 & $0 / 0$ \\
+Jiang et al.\ (QPause)~\cite{jiang2024qpause} & $(t, N)$ & Zipf & ROM & FHE & yes & no & 1 & $0 / 0$ \\
+QPASE~\cite{jiang2024qpase} & $(t, N)$ & Zipf & ROM & OPRF & yes & yes & 1 & $0 / 0$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Three points stand out in the paper's comparison. QPASE is the only scheme in the table that is both quantum
+resistant and lets the user retrieve data. Only QPASE and QPause model passwords with Zipf's law, which matches
+how people choose passwords better than a uniform distribution~\cite{wang2017zipf}. And the lattice schemes need
+no exponentiations at all, so their entries read $0 / 0$.
+
+The last column needs care. It counts only exponentiations, so it says nothing about the lattice operations that
+replace them. In our implementation a single lattice PRF chain takes \AxMedian, and every user-side phase spends at
+least \ChainShareMin{} of its time in such chains (\cref{sec:evaluation-qpase}). A $0 / 0$ entry therefore does not
+mean that QPASE is cheap. It means that its cost lies in a different operation, which this table does not count.
+Table~V also does not compare search privacy. None of its columns covers forward privacy, the property the
+counter index adds.

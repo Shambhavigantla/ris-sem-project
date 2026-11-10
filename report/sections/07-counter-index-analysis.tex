@@ -1,4 +1,134 @@
 \section{Analysis of the Proposed Scheme}
 \label{sec:counter-analysis}
 
-\todo{Write this section (handoff, Section~3.2): correctness, the leakage table (what a server learns), the forward-privacy argument, resilience against server attacks, and the costs we accept.}
+This section argues informally why the counter index is correct, what each server learns, and how it handles a
+dishonest server. We give no formal proof. The threat model is that of \cref{sec:qpase}, except where we say a
+server deviates from the protocol.
+
+\subsection{Correctness}
+
+A search for $w$ returns exactly the files filed under $w$, for four reasons.
+\begin{enumerate}
+  \item \textbf{The user asks for every label of $w$ and no other.} Each Outsource under $w$ uses the next counter
+        value $j = c_w + 1$, and $c_w$ grows only after a server accepts the row. So the rows under $w$ carry
+        exactly the labels $1$ to $c_w$, and R1 asks for all of them. A label of another keyword comes from a
+        different $K_w$, so it equals one of these only by a collision of a 256-bit PRF output.
+  \item \textbf{Every row is found.} The user sends the labels to all $N$ servers, so a row is found wherever it
+        is stored.
+  \item \textbf{Only genuine rows survive.} R3 keeps a row only if the user asked for its label and the label
+        inside the opened entry matches. The entry is encrypted with AES-256-GCM under $k_{ptr}$, so a server
+        cannot forge one.
+  \item \textbf{Only the right files survive.} Each fetched $C$ must match the SHA3-256 hash in its entry before
+        the user decrypts it.
+\end{enumerate}
+Two edge cases keep this true. If a label was skipped at O5, the earlier upload stored a real row under it, and
+the search still finds that row. If two servers hold rows under the same label, both rows are genuine, so R3 keeps
+every valid row. It removes only exact duplicates: the same row returned twice.
+
+\subsection{What a server learns}
+
+\Cref{tab:ci-leakage} lists what a server learns at each event.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{What a server learns from the counter index.}
+\label{tab:ci-leakage}
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+\textbf{Event} & \textbf{What the server learns} \\
+\midrule
+Outsource & a new row (a random-looking label and entry), the file $C$ under its item id, and the counter
+table's size in 1024-byte blocks and its version \\
+Search & the $c_w$ labels, which of them hit on this server, and which files the user then fetches \\
+Repeated search for $w$ & the same labels again, so it can link the two searches (the search pattern) \\
+Upload after a search & nothing that links the new row to the old labels \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+At Outsource a server sees a label and an entry that look random. It cannot tell which keyword they belong to or
+whether two rows share one. It sees the file $C$, as in QPASE. From the counter table it learns only the number
+of 1024-byte blocks, not the number of keywords, and from the version it learns how many uploads the user has made.
+
+At a search the server sees $c_w$ labels, so it learns how many files are filed under $w$. It learns which of
+those labels it holds, and at R4 which files the user fetches (the access pattern).
+
+A second search for $w$ sends the same labels, plus any new ones. The server can therefore tell that two searches
+were for the same keyword (the search pattern). QPASE leaks the same thing, since it sends the same $\dsk$ every
+time.
+
+A row uploaded after a search carries $\mathit{label}(w, c_w + 1)$, a value the server has never seen and cannot
+compute. Nothing links it to the earlier search.
+
+\subsection{Forward privacy}
+
+A scheme is forward private if a search made in the past cannot match files uploaded after it. In QPASE the
+server keeps $\dsk$ from a search, and $\dsk$ is all it needs to test any later item, so QPASE is not forward
+private. In the counter index the server never receives $K_w$. A search request holds only the labels $1$ to
+$c_w$. A later upload under $w$ gets the label $c_w + 1$, which is a PRF output under $K_w$, so the server cannot
+compute it from the labels it has. A stored search request therefore finds only files that existed when it was
+made. \Cref{sec:counter-evaluation} shows this happening.
+
+The scheme does not give backward privacy, which would hide deleted files from later searches. Our implementation
+has no deletion at all, in QPASE or in the counter index.
+
+\subsection{Attacks by a dishonest server}
+
+\paragraph{Moving an entry to another label.} A server could store an entry under another label, hoping the user
+will accept it as a match for a different keyword. The entry carries its own label inside the encryption. At R3
+the user opens it and drops it, because the label inside differs from the label it came with. Our tests move an
+entry and check that R3 drops it.
+
+\paragraph{Swapping a stored file.} A server could return another ciphertext under the same item id. The entry
+holds $\mathrm{SHA3\text{-}256}(C)$, so the user rejects the swapped file at R5 before it decrypts anything. Our
+tests swap a file and check that it is rejected.
+
+\paragraph{Answering with another keyword's row.} A server could answer a search for $w$ with a genuine row of a
+different keyword $w'$. All entries use the same $k_{ptr}$, so that entry would open correctly, and its inside label
+would match its own label. R3 stops this by first dropping any row whose label the user did not ask for in R1. Our tests
+send such a row and check that R3 drops it.
+
+\paragraph{Serving a stale or forged counter table.} A server could serve an old upload, hoping the user searches
+fewer labels or reuses a label. Every upload is signed under $pk_u$, so a server cannot forge one, and a table
+signed by another user fails the check. An old upload is still validly signed, so the user takes the highest
+version among the servers it contacts. The user uploads each table to all $N$ servers, and the adversary corrupts
+fewer than $t$ of them, so at least one of the $t$ servers contacted at Login is honest and serves the latest
+version. A server also refuses an upload whose version is not higher than the one it holds, so an old table
+cannot overwrite a newer one. Our tests check that the server refuses a stale version and a table signed by another
+user.
+
+\paragraph{Replaying a search request.} A server that kept an old search request learns nothing new by replaying
+it. It holds the same labels as before, and these labels do not cover files uploaded later. Notebook~07 replays
+such a request after a new upload and gets back only the old files. The search and fetch requests are signed, but
+the signature does not cover the session identifier. A replayed request therefore still verifies. It returns only
+encrypted entries and files, and it reveals nothing the server did not see the first time.
+
+\subsection{Costs we accept}
+\label{sec:counter-costs}
+
+The design has costs that QPASE does not have.
+\begin{itemize}
+  \item \textbf{The counter table grows with the number of keywords.} It grows in 1024-byte blocks, and every
+        server stores one copy per user.
+  \item \textbf{Login gains a download.} Step L4 fetches the counter table from each contacted server, and Outsource
+        uploads it to every server after each file.
+  \item \textbf{Retrieve takes two round trips.} The server cannot follow an encrypted pointer, so the user fetches
+        the files in a second round.
+  \item \textbf{The search message grows with $c_w$.} The request carries one 32-byte label for each matching
+        file, where the paper's request has a fixed size.
+  \item \textbf{Two devices at once must sync the counter.} Two devices that upload under the same keyword at the
+        same time pick the same $j$. Both may upload a counter table with the same version, and the servers refuse
+        the second.
+  \item \textbf{The server still sees the access pattern.} Step R4 shows which files a search returns.
+\end{itemize}
+
+\subsection{Quantum resistance}
+
+The counter index adds no new primitive. Labels use the lattice PRF, the keys come from the same HKDF, entries and
+the counter table use AES-256-GCM, and every request is signed with ML-DSA-44. QPASE already relies on all four,
+and \cref{sec:background} explains why each is believed to resist quantum attacks. The one new building block is SHA3-256,
+which binds each file to its row. Grover's algorithm speeds up a search for a preimage~\cite{grover1996}, but a
+256-bit output leaves a large margin.
+We therefore expect the index to be as quantum resistant as QPASE itself. This is an informal argument, not a
+proof.

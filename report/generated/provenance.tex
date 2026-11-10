@@ -74,6 +74,15 @@
 \texttt{\textbackslash ScalingChecks}: 144 & notebook 08, cell 6 & timed scaling runs whose result was checked \\
 \texttt{\textbackslash ScalingFailures}: 0 & notebook 08, cell 6 & failed checks over the scaling runs \\
 \texttt{\textbackslash ScalingLookups}: [3] & notebook 08, cell 6 & lookups per server in every run \\
+\texttt{\textbackslash CiRecoveredItems}: [1, 3, 6] & notebook 07, cell 13 & items the counter index recovers for medical \\
+\texttt{\textbackslash CiRTwoAllServers}: 15 ms & notebook 07, cell 10 & time of the label search on all 3 servers \\
+\texttt{\textbackslash ScalingPaperThreeTenThousand}: 537 ms & notebook 08, cell 7 & paper slowest server, N = 3, 10\textasciicircum{}4 files \\
+\texttt{\textbackslash ScalingPaperThreeHundredThousand}: 721 ms & notebook 08, cell 7 & paper slowest server, N = 3, 10\textasciicircum{}5 files \\
+\texttt{\textbackslash ScalingIndexSumThree}: 13.7 ms & notebook 08, cell 7 & counter index, all servers, N = 3, 10\textasciicircum{}2 files \\
+\texttt{\textbackslash ScalingIndexSumSeven}: 33.3 ms & notebook 08, cell 7 & counter index, all servers, N = 7, 10\textasciicircum{}2 files \\
+\texttt{\textbackslash ScalingPaperSumThree}: 1.66 s & notebook 08, cell 7 & paper, all servers, N = 3, 10\textasciicircum{}2 files \\
+\texttt{\textbackslash ScalingSumSpeedupThree}: 120.6 & notebook 08, cell 5 & speed-up over all servers, N = 3, 10\textasciicircum{}2 files \\
+\texttt{\textbackslash ScalingSumSpeedupSeven}: 48.4 & notebook 08, cell 5 & speed-up over all servers, N = 7, 10\textasciicircum{}2 files \\
 \texttt{\textbackslash CostRegisterUser}: 1.39 s & notebook 05, cell 13 & median of RegisterUser in notebook 05 \\
 \texttt{\textbackslash CostRegisterServer}: 1.19 ms & notebook 05, cell 13 & median of RegisterServer in notebook 05 \\
 \texttt{\textbackslash CostLoginUser}: 1.90 s & notebook 05, cell 13 & median of LoginUser in notebook 05 \\
@@ -115,6 +124,10 @@
 \texttt{\textbackslash ScalingSpeedupMin}: 109 & notebook 08, cell 7 (derived from the table) & smallest speed-up at the slowest server \\
 \texttt{\textbackslash ScalingSpeedupMax}: 152 & notebook 08, cell 7 (derived from the table) & largest speed-up at the slowest server \\
 \texttt{\textbackslash ScalingSpeedupMedian}: 114 & notebook 08, cell 7 (derived from the table) & median speed-up at the slowest server \\
+\texttt{\textbackslash ScalingUserPaperMin}: 1.96 s & notebook 08, cell 7 (derived from the table) & fastest paper user median over the grid \\
+\texttt{\textbackslash ScalingUserPaperMax}: 2.34 s & notebook 08, cell 7 (derived from the table) & slowest paper user median over the grid \\
+\texttt{\textbackslash ScalingUserIndexMin}: 1.93 s & notebook 08, cell 7 (derived from the table) & fastest counter-index user median over the grid \\
+\texttt{\textbackslash ScalingUserIndexMax}: 2.44 s & notebook 08, cell 7 (derived from the table) & slowest counter-index user median over the grid \\
 \texttt{\textbackslash RatioRegisterUser}: 1,400 & notebook 05, cell 13, over the paper's Table IV & our RegisterUser median divided by the paper's \\
 \texttt{\textbackslash RatioLoginUser}: 3,000 & notebook 05, cell 13, over the paper's Table IV & our LoginUser median divided by the paper's \\
 \texttt{\textbackslash RatioOutsourceUser}: 62 & notebook 05, cell 13, over the paper's Table IV & our OutsourceUser median divided by the paper's \\
