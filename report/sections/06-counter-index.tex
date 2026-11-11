@@ -1,160 +1,62 @@
 \section{Proposed Scheme: A Counter-Based Search Index}
 \label{sec:counter-index}
 
-This section describes the search index we propose in place of the paper's per-item tags. We keep the rest of
-QPASE as \cref{sec:qpase} describes it. The full design, with every decision we took while building it, is in
+The paper's search has two problems. \textbf{The search key is permanent}: a server can keep $\dsk$ from one search
+and test every later upload with it, so the scheme has no forward privacy. \textbf{Every search tries every item}:
+the server tries $\dsk$ on all stored items and runs one lattice PRF chain per match. We replace the per-item tags
+with an encrypted lookup table in the style of Cash et al.~\cite{cash2014dynamic}. The full design is in
 \texttt{docs/counter-index-spec.md}.
-
-\subsection{Motivation}
-
-The paper's search has two problems. Both come from the same place: an item's tag $Ct$ shows a match only when
-a key is tried on it.
-\begin{enumerate}
-  \item \textbf{The search key is permanent.} To search for $w$, the user sends $\dsk = \mathrm{HKDF}(\Ku, w)$ to
-        every server (step R1). A server can keep $\dsk$ and test every item uploaded later with it, without the
-        user searching again. The scheme therefore has no forward privacy.
-  \item \textbf{Every search tries every item.} A server cannot tell which tags match, so at step R2 it tries
-        $\dsk$ on every item it stores. Search work grows with the total storage, not with the number of matches.
-        For each item that does match, the server also runs one lattice PRF chain to check $v$.
-\end{enumerate}
-We replace the tags with an encrypted lookup table. The search key never leaves the device, and a server finds
-the matching rows by direct lookup.
 
 \subsection{Design}
 
-\paragraph{Keys.} The user derives three keys from $\Ku$, and none of them leaves the device. The keyword key
-$K_w = \mathrm{HKDF}(\Ku, w)$ is the paper's $\dsk$, which the user now keeps to itself. The pointer key $k_{ptr}$
-and the counter key $k_{ctr}$ are the two halves of one HKDF output under a fixed label. The user derives them once
-per session, so they cost one PRF chain together.
+\paragraph{Keys.} The user derives three keys from $\Ku$, and none leaves the device: the keyword key
+$K_w = \mathrm{HKDF}(\Ku, w)$, which is the paper's $\dsk$, and the pointer key $k_{ptr}$ and counter key $k_{ctr}$,
+the two halves of one HKDF output.
 
-\paragraph{Labels.} The $j$-th file filed under keyword $w$ gets the label
+\paragraph{Labels and rows.} The $j$-th file under keyword $w$ gets the label
+$\mathit{label}(w, j) = \mathrm{PRF}(K_w, j)$, truncated to \CiLabelBytes. Its row stores the label with the entry
 \[
-\mathit{label}(w, j) = \text{first 32 bytes of } \mathrm{PRF}(K_w, \texttt{"QPASE/ci/label/"} \,\|\, j),
-\qquad j = 1, 2, \dots
+\mathit{entry} = \mathrm{Enc}\big(k_{ptr},\ (\mathit{label},\ i,\ \mathrm{SHA3\text{-}256}(C))\big).
 \]
-A label is \CiLabelBytes. It looks random to anyone without $K_w$. Each label costs the user one PRF chain. We
-keep the scheme's own lattice PRF on purpose, so the index adds no new primitive.
+The entry hides which file the row points to. The label inside stops a server from moving the entry to another
+label, and the hash binds the row to one file. Each server keeps a dictionary per user from label to entry.
 
-\paragraph{Index rows.} A row is one label and its entry. The entry is
-\[
-\mathit{entry} = \mathrm{Enc}\big(k_{ptr},\ (\mathit{label},\ i,\ \mathrm{SHA3\text{-}256}(C))\big),
-\]
-where $i$ is the item id and $C = \mathrm{Enc}(\Ku, d)$ is the encrypted file, unchanged from QPASE. The entry
-hides which file the row points to. The label inside it stops a server from moving the entry to another label.
-The hash inside it binds the row to one file, so a server cannot return a different $C$ under the same item id.
-Each server keeps a dictionary per user, from label to entry, and stores $C$ under $i$. Each file has one keyword,
-as in the rest of our implementation, so there is one row per file.
-
-\paragraph{Counter table.} The counter table maps each keyword $w$ to $c_w$, the number of files filed under $w$
-so far. The user holds it in memory during a session. The servers keep a sealed copy, so that a user who logs in
-from another device gets the same counters. To seal the table, the user writes it as JSON, pads it with zero bytes
-to the next multiple of 1024 bytes and encrypts it under $k_{ctr}$ together with a version number. The padding
-hides the exact number of keywords. The user signs the version and the sealed table with $sk_u$ and uploads both to
-all $N$ servers, so that any $t$ of them can serve it at Login. A server accepts an upload only if the signature
-verifies under $pk_u$ and the version is higher than the one it holds. A user with no table yet has an empty table
-at version 0.
-
-\Cref{tab:ci-notation} adds the new notation to \cref{tab:notation}.
-
-\begin{table}[ht]
-\centering
-\small
-\caption{Notation of the counter index.}
-\label{tab:ci-notation}
-\begin{tabular}{ll}
-\toprule
-\textbf{Symbol} & \textbf{Meaning} \\
-\midrule
-$K_w = \mathrm{HKDF}(\Ku, w)$ & keyword key, the paper's $\dsk$; never leaves the device \\
-$k_{ptr}$, $k_{ctr}$ & pointer key and counter key, two halves of one HKDF output \\
-$c_w$ & number of files filed under $w$ so far \\
-$\mathit{label}(w, j)$ & label of the $j$-th file under $w$, 32 bytes of $\mathrm{PRF}(K_w, j)$ \\
-$\mathit{entry}$ & $\mathrm{Enc}(k_{ptr}, (\mathit{label}, i, \mathrm{SHA3\text{-}256}(C)))$ \\
-$T$, $v_T$ & counter table $\{w \mapsto c_w\}$ and its version \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Counter table.} The table maps each keyword to $c_w$, the number of files under it. The user holds it
+during a session. The servers keep a copy sealed under $k_{ctr}$, padded to 1024-byte blocks to hide the number of
+keywords, versioned, and signed with $sk_u$, so a new device gets the same counters. A server accepts an upload only
+with a valid signature and a higher version.
 
 \subsection{Phases}
 
-Register, Login steps L1 to L3 and the server key update do not change. $\Ku$ stays the same across a key update,
-so $K_w$, the labels and the counter table stay valid. Login gains one step, and Outsource and Retrieve are
-replaced.
+Register, Login steps L1 to L3 and the key update do not change, and since $\Ku$ survives a key update, so do the
+labels.
 
-\begin{protocol}{Login, extra step L4}
-\begin{enumerate}[L4.]
-  \item After L3 succeeds, $U$ asks each contacted server for its stored counter table upload. A server answers
-        only a user who passed L3 in the current session. $U$ keeps each upload whose signature verifies under
-        $pk_u$ and whose sealed table opens under $k_{ctr}$ with the same version inside as the signed one. It takes
-        the upload with the highest version. If none passes, the table is empty at version 0.
+\begin{protocol}{Login step L4 and Outsource with the counter index}
+\begin{enumerate}[1.]
+  \item \textbf{L4.} After L3, $U$ fetches the sealed table from each contacted server. It keeps the uploads whose
+        signature verifies and whose table opens with the signed version inside, and takes the highest version.
+  \item \textbf{O1.} For a file $d$ under $w$ with item id $i$, $U$ sets $j = c_w + 1$ and computes
+        $\mathit{label}(w, j)$, $C = \mathrm{Enc}(\Ku, d)$ and the entry. It sends them with a signature to one
+        server.
+  \item \textbf{O2.} The server verifies the signature and stores the row and $C$, unless the label already exists
+        or the user's $M$ slots are full.
+  \item \textbf{O3.} After the server accepts, $U$ sets $c_w = j$ and uploads the new sealed table to all $N$
+        servers. If the label already existed, an earlier upload was interrupted; $U$ moves to the next label.
 \end{enumerate}
 \end{protocol}
 
-\begin{protocol}{Outsource with the counter index (replaces O1 and O2)}
-\begin{enumerate}[O1.]
-  \item For a file $d$ with keyword $w$ and item id $i$, $U$ sets $j = c_w + 1$ and computes
-        $\mathit{label}(w, j)$, $C = \mathrm{Enc}(\Ku, d)$ and the entry.
-  \item $U$ signs $(\mathit{label}, \mathit{entry}, i, C)$ with $sk_u$ and sends all of it to one server of its
-        choice.
-  \item The server verifies the signature under $pk_u$. It refuses the request if the label is already in the user's
-        dictionary or the user's $M$ slots are full. Otherwise it stores the row and stores $C$ under $i$.
-  \item Only after the server accepts does $U$ set $c_w = j$. It then seals the new table with version $v_T + 1$, signs it
-        and uploads it to all $N$ servers.
-  \item If the server answers that the label already exists, an earlier upload stored the row but its table upload did
-        not finish. $U$ sets $c_w = j$ without an upload and retries once from O1 with the next label.
-\end{enumerate}
-\end{protocol}
-
-\begin{protocol}{Retrieve with the counter index (replaces R1 to R3)}
+\begin{protocol}{Retrieve with the counter index}
 \begin{enumerate}[R1.]
-  \item If $c_w = 0$, $U$ returns no files and contacts no server. Otherwise it computes $\mathit{label}(w, j)$ for
-        $j = 1, \dots, c_w$, signs the list, and sends it to all $N$ servers. $U$ does not know which server holds
-        which row.
-  \item Each $S_i$ verifies the signature and looks up each label in the user's dictionary. It does $c_w$
-        lookups and scans nothing. It returns the (label, entry) pairs it found.
-  \item $U$ drops any row whose label it did not ask for in R1. It opens each remaining entry with $k_{ptr}$ and
-        drops it if the label inside differs from the label it came with. From each entry it keeps, $U$ records
-        the item id and the file hash. A row that several servers return is kept once.
-  \item $U$ sends a signed list of item ids to each server that returned hits. The server returns the stored $C$
-        for each id it holds.
-  \item $U$ checks $\mathrm{SHA3\text{-}256}(C)$ against the hash from the entry and decrypts
-        $d = \mathrm{Dec}(\Ku, C)$.
+  \item If $c_w = 0$, $U$ returns nothing. Otherwise it sends the signed list $\mathit{label}(w, 1), \dots,
+        \mathit{label}(w, c_w)$ to all $N$ servers.
+  \item Each server verifies the signature, does $c_w$ dictionary lookups, and returns the rows it holds.
+  \item $U$ drops rows whose label it did not ask for, opens each entry with $k_{ptr}$, drops entries whose inside
+        label differs, and keeps duplicates once.
+  \item $U$ sends a signed list of item ids to each server that returned hits and gets back the files.
+  \item $U$ checks each file's hash against its entry and decrypts $d = \mathrm{Dec}(\Ku, C)$.
 \end{enumerate}
 \end{protocol}
 
-Retrieve now takes two round trips, because a server cannot follow an encrypted pointer by itself. Step R4 shows
-the server which files the search returned. We accept this leakage (\cref{sec:counter-costs}).
-
-The worked example of \cref{tab:ci-example} shows what each side sees. The user can work out every label from
-its keys. The server sees five unrelated rows. It cannot tell which rows share a keyword, or how many keywords
-there are.
-
-\begin{table}[ht]
-\centering
-\small
-\caption{A worked example with two keywords. Labels are shortened and made up for illustration; real labels are
-256-bit PRF outputs. Rows are stored in a random order at the server.}
-\label{tab:ci-example}
-\begin{tabular}{llll@{\hspace{2.5em}}ll}
-\toprule
-\multicolumn{4}{c}{\textbf{What only the user can work out}} & \multicolumn{2}{c}{\textbf{What the server stores}} \\
-\cmidrule(lr){1-4}\cmidrule(lr){5-6}
-\textbf{Keyword} & $j$ & \textbf{Label} & \textbf{File} & \textbf{Label} & \textbf{Entry} \\
-\midrule
-invoices & 1 & \texttt{3b90\dots5e} & A & \texttt{1f7c\dots a3} & encrypted pointer to B \\
-invoices & 2 & \texttt{a47d\dots09} & C & \texttt{3b90\dots5e} & encrypted pointer to A \\
-invoices & 3 & \texttt{d6f1\dots72} & D & \texttt{8e12\dots c4} & encrypted pointer to E \\
-contracts & 1 & \texttt{1f7c\dots a3} & B & \texttt{a47d\dots09} & encrypted pointer to C \\
-contracts & 2 & \texttt{8e12\dots c4} & E & \texttt{d6f1\dots72} & encrypted pointer to D \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Related designs}
-
-The index is a counter-based encrypted dictionary in the style of Cash et al.~\cite{cash2014dynamic}, who derive
-the $j$-th label of a keyword from a per-keyword key and a counter. Forward privacy as a design goal for dynamic
-searchable encryption comes from Stefanov et al.~\cite{stefanov2014practical}, and Bost built an efficient
-forward-private scheme around it~\cite{bost2016sophos}. Our design differs from these in two ways. Its keys come
-from a password through the TOPRF of QPASE, so the user stores no key on any device. The counters are kept sealed on
-the servers, so a new device can rebuild them at Login.
+Retrieve takes two round trips, because a server cannot follow an encrypted pointer. Unlike forward-private schemes
+such as Bost's~\cite{bost2016sophos}, our keys come from a password through the TOPRF, so the user stores no key on
+any device.

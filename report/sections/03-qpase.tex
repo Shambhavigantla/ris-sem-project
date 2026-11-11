@@ -1,117 +1,48 @@
 \section{The QPASE Scheme}
 \label{sec:qpase}
 
-This section restates QPASE as Sections III and IV of the paper specify it~\cite{jiang2024qpase}. Where our
-implementation departs from the printed text, \cref{sec:decisions} says so.
+This section restates QPASE as Sections III and IV of the paper specify it~\cite{jiang2024qpase}.
 
-\subsection{System and threat model}
+\paragraph{Model.} The user remembers only $ID_u$ and $psw_u$ and stores no key. Each of $N$ semi-honest servers
+holds a share $k_i$, a record $(ID_u, pk_u, \mu_u)$ per user, and encrypted files. A quantum adversary controls the
+network and may corrupt fewer than $t$ servers. It tries offline and online password guessing and chosen-keyword
+attacks on the index. The servers refuse a user after $\mu$ login attempts in one epoch.
 
-QPASE has one kind of user and a set of $N$ cloud servers $S = \{S_1, \dots, S_N\}$.
-\begin{itemize}
-  \item \textbf{User $U$.} The user remembers only $ID_u$ and $psw_u$, and stores no key on any device. At every
-        Login it rebuilds $\Ku$ with $t$ servers and derives everything else from it.
-  \item \textbf{Servers.} Each server holds a share $k_i$ of the master key $K$, a record
-        $(ID_u, pk_u, \mu_u)$ per user, and the user's encrypted files. The servers are semi-honest and talk to each
-        other over secure channels.
-  \item \textbf{Adversary.} A quantum adversary controls the network and may corrupt up to $t' < t$ servers. It
-        tries three attacks: offline password guessing, online password guessing, and chosen-keyword attacks
-        against the search index.
-\end{itemize}
-The paper proves authentication security in the Bellare--Pointcheval--Rogaway model~\cite{bellare2000bpr},
-with passwords following Zipf's law~\cite{wang2017zipf}, and keyword privacy as indistinguishability under
-chosen-keyword attacks (IND-CKA). The servers count login attempts per user and refuse after $\mu$ in one epoch,
-which bounds online guessing.
+\paragraph{Setup.} Setup publishes the ring $\Rq$ with $q = 2^{28} - 57$, the vectors $a, a_0, a_1$, $\sigma$,
+$\mu$, $N$ and $t$. Table II of the paper gives two ring degrees: PARAM~I with $n = 512$ (92-bit quantum security)
+and PARAM~II with $n = 595$ (128-bit), which its experiments use.
 
-\subsection{Setup}
-
-Setup publishes the parameters $pp$: the ring $\Rq$, the public vectors $a, a_0, a_1 \in \Rq^{1\times\ell}$, the
-Gaussian width $\sigma$, the attempt limit $\mu$, the numbers $N$ and $t$, and the hash, HKDF, PRF, encryption
-and signature algorithms. The servers then run the distributed key generation, so that $S_i$ holds $k_i$ and
-publishes $pk_i$. Table II of the paper fixes $q = 2^{28} - 57$ and two ring degrees: PARAM~I with $n = 512$, rated
-at 92-bit quantum security, and PARAM~II with $n = 595$, rated at 128-bit quantum security. The paper's
-experiments use PARAM~II.
-
-\subsection{Register}
-
-\begin{protocol}{Register (paper Section IV-B, Fig.~5)}
+\begin{protocol}{Register and Login (paper Sections IV-B and IV-C)}
 \begin{enumerate}[1.]
-  \item $U$ encodes $psw_u$ as $x \in \{0,1\}^L$ and runs the TOPRF with every server $S_i$ to obtain
-        $\Ku = F_K(x)$. Each server rejects an $ID_u$ it already holds.
-  \item $U$ derives its signature key pair $(pk_u, sk_u) \leftarrow \mathrm{Gen}(1^\kappa, \Ku)$ and sends $pk_u$
-        to every $S_i$.
-  \item Each $S_i$ stores $(ID_u, pk_u)$ next to its share $k_i$ and sets the attempt counter $\mu_u = 0$.
-  \item $U$ keeps only $ID_u$ and $psw_u$.
+  \item \textbf{Register.} $U$ runs the TOPRF with every server to get $\Ku = F_K(x)$, derives
+        $(pk_u, sk_u) \leftarrow \mathrm{Gen}(\Ku)$ and sends $pk_u$. Each $S_i$ stores $(ID_u, pk_u)$ and sets
+        $\mu_u = 0$.
+  \item \textbf{L1.} $U$ runs the TOPRF with $t$ servers. Each checks $\mu_u < \mu$, increments $\mu_u$, answers
+        and returns $pk_u$.
+  \item \textbf{L2.} $U$ recomputes $pk'_u$ from $\Ku$. If $pk'_u \neq pk_u$ the password was wrong. Otherwise it
+        signs $\sigma_u = \mathrm{Sign}(sk'_u, (ID_u, sid))$.
+  \item \textbf{L3.} $S_i$ verifies $\sigma_u$ and lets $U$ upload and search.
 \end{enumerate}
 \end{protocol}
 
-\subsection{Login}
-
-\begin{protocol}{Login (paper Section IV-C, Fig.~5)}
-\begin{enumerate}[L1.]
-  \item $U$ runs the TOPRF on $x$ with $t$ servers. Each contacted $S_i$ first checks $\mu_u < \mu$ and aborts
-        otherwise, then sets $\mu_u \leftarrow \mu_u + 1$, answers, and returns $pk_u$.
-  \item $U$ recomputes $(pk'_u, sk'_u)$ from $\Ku$. If $pk'_u \neq pk_u$ the password was wrong, and $U$ asks for
-        it again. Otherwise $U$ signs $\sigma_u \leftarrow \mathrm{Sign}(sk'_u, (ID_u, sid))$ for the session
-        identifier $sid$.
-  \item $S_i$ verifies $\sigma_u$ under $pk_u$. On success it lets $U$ upload and search. On failure it aborts and
-        sets $\mu_u \leftarrow \mu_u + 1$.
-\end{enumerate}
-\end{protocol}
-
-A wrong password is caught at step L2 on the user's side, without any extra round. The server never sees the
-password, the user key or the signing key.
-
-\subsection{Outsource}
-
-\begin{protocol}{Outsource (paper Section IV-D, Fig.~6)}
-\begin{enumerate}[O1.]
-  \item For a document $d$ with keyword $w$ and item id $i$, $U$ samples $\rho \leftarrow \mathbb{Z}_q$ and
-        computes
-        \begin{align*}
-        \dsk &= \mathrm{HKDF}(\Ku, w), & v &= \mathrm{PRF}(\dsk, \rho), & C &= \mathrm{Enc}(\Ku, d), \\
-        \sigma_C &= \mathrm{Sign}(sk_u, (\rho, v, C)), & Ct &= \mathrm{Enc}(\dsk, (\rho, v, \sigma_C)), &
-        \sigma_{Ct} &= \mathrm{Sign}(sk_u, (Ct, C, i)).
-        \end{align*}
-        $U$ sends $(Ct, C, i)$ and $\sigma_{Ct}$ to a server of its choice.
-  \item The server verifies $\sigma_{Ct}$ under $pk_u$ and, if it holds, stores $(Ct, C, i)$. Each server offers
-        the user $M$ storage slots.
-\end{enumerate}
-\end{protocol}
-
-\subsection{Retrieve}
-
-\begin{protocol}{Retrieve (paper Section IV-E, Fig.~6)}
-\begin{enumerate}[R1.]
-  \item $U$ computes $\dsk = \mathrm{HKDF}(\Ku, w)$ and $\sigma_{\dsk} = \mathrm{Sign}(sk_u, \dsk)$ and sends both
-        to every server.
-  \item Each $S_i$ verifies $\sigma_{\dsk}$. For every stored $(Ct, C, i)$ it decrypts
-        $(\rho, v, \sigma_C) = \mathrm{Dec}(\dsk, Ct)$ and adds the item to its list $L_i$ if
-        $\mathrm{Ver}(pk_u, (\rho, v, C), \sigma_C)$ holds and $v = \mathrm{PRF}(\dsk, \rho)$. It returns $L_i$.
-  \item $U$ repeats the same check on each returned item and decrypts $d = \mathrm{Dec}(\Ku, C)$.
-\end{enumerate}
-\end{protocol}
-
-The server finds a match by trying $\dsk$ on every item it stores. Items under other keywords fail at the
-decryption. The user sends the same $\dsk$ every time it searches for $w$.
-
-\subsection{Server key update}
-
-\begin{protocol}{Server key update (paper Section IV-F)}
+\begin{protocol}{Outsource and Retrieve (paper Sections IV-D and IV-E)}
 \begin{enumerate}[1.]
-  \item Each $S_j$ chooses a random polynomial $[F]_j(X) = \sum_{k=1}^{t-1} \alpha_k X^k$ with constant term 0.
-  \item $S_j$ computes commitments $h = \{H(\alpha_k)\}$ and the shares $F_{ji} = [F]_j(i)$.
-  \item $S_j$ sends each $S_i$ the share $F_{ji}$, encrypted to $S_i$, with $h$, its epoch $\omega$ and a signature.
-  \item $S_i$ decrypts each share and checks the signature and $H(F_{ji}) = \sum_k i^k H(\alpha_k)$. It then
-        updates $k'_i = k_i + \sum_j \lambda_{i,j} [F]_j(i)$.
-  \item $S_i$ recomputes $pk'_i$, resets every $\mu_u$, and starts epoch $\omega + 1$.
+  \item \textbf{O1.} For a document $d$ with keyword $w$ and item id $i$, $U$ samples $\rho$ and computes
+        $\dsk = \mathrm{HKDF}(\Ku, w)$, $v = \mathrm{PRF}(\dsk, \rho)$, $C = \mathrm{Enc}(\Ku, d)$,
+        $\sigma_C = \mathrm{Sign}(sk_u, (\rho, v, C))$ and $Ct = \mathrm{Enc}(\dsk, (\rho, v, \sigma_C))$. It sends
+        $(Ct, C, i)$ with a signature to one server.
+  \item \textbf{O2.} The server verifies the signature and stores $(Ct, C, i)$.
+  \item \textbf{R1.} $U$ sends $\dsk$ and $\mathrm{Sign}(sk_u, \dsk)$ to every server.
+  \item \textbf{R2.} Each $S_i$ decrypts every stored $Ct$ with $\dsk$ and returns the items where
+        $\mathrm{Ver}(pk_u, (\rho, v, C), \sigma_C)$ holds and $v = \mathrm{PRF}(\dsk, \rho)$.
+  \item \textbf{R3.} $U$ repeats the check on each returned item and decrypts $d = \mathrm{Dec}(\Ku, C)$.
 \end{enumerate}
 \end{protocol}
 
-Because every update polynomial has constant term 0, the master key $K$ does not change (the paper's Lemma 3).
-Users therefore keep their $\Ku$ and their stored files, and need not take part in the update.
+The server finds a match by trying $\dsk$ on every item it stores, and the user sends the same $\dsk$ every time it
+searches for $w$. \Cref{sec:counter-index} builds on both facts.
 
-\subsection{Multiple keywords}
-
-Section IV-G of the paper sketches an extension to several keywords per document, with conjunctive, disjunctive
-and subset queries. It lies outside the paper's main protocol, its proofs and its experiments, and we left it out
-of this project.
+\paragraph{Server key update.} Each server deals shares of a random polynomial with constant term 0, with
+commitments $H(\alpha_k)$ to its coefficients. Each $S_i$ checks $H(F_{ji}) = \sum_k i^k H(\alpha_k)$ and adds the
+shares to $k_i$. The master key $K$ does not change, so users keep $\Ku$ and their files. The paper also sketches
+multi-keyword queries (Section IV-G), which we left out.

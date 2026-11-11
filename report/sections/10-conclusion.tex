@@ -1,46 +1,14 @@
 \section{Conclusion and Future Research Directions}
 \label{sec:conclusion}
 
-\subsection{Conclusion}
+We implemented QPASE from the paper alone, and it works as described once its gaps are filled. The lattice PRF sets
+its cost: one chain takes \AxMedian{}, and chains take at least \ChainShareMin{} of every user-side phase. PARAM~II
+is unsafe in the ring $\mathbb{Z}_q[X]/(X^{595}+1)$, and the linear key-update commitments reveal the shares. Our
+counter-based index keeps the search key on the device, gives forward privacy, and made the slowest server's search
+\ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster, mostly by removing the server's PRF chain per match. The
+user's cost is unchanged, at the price of a second round trip and a shared counter table.
 
-We implemented QPASE in Python from the paper alone. The scheme works as the paper describes once its gaps are
-filled. The same password gives the same user key in every login, a wrong password fails at step L2, and a search
-returns exactly the matching files. \Cref{sec:decisions} records each choice the paper left open.
-
-Building and measuring the scheme taught us three things. First, the lattice PRF sets the cost of the whole scheme.
-One PRF chain takes \AxMedian, and every user-side phase spends at least \ChainShareMin{} of its time in such
-chains. Second, PARAM~II is unsafe in the ring $\mathbb{Z}_q[X]/(X^{595}+1)$, our reading of the scheme text,
-because $X = -1$ is a root and lets one server test password guesses offline. Third, the linear commitments of our
-key-update instantiation reveal every update share to anyone who sees them.
-
-We then proposed a counter-based search index. It keeps the search key on the user's device, answers a search with
-dictionary lookups, and gives forward privacy: a stored search request does not find files uploaded after it.
-Notebook~07 shows each of these properties. In notebook~08 the counter index's slowest server searched
-\ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster than the paper's for $10^2$ to $10^5$ stored files, with
-no crossover. The speed-up comes mostly from removing the server's PRF chain for each match, not from removing the
-scan. The user's cost is the same in both schemes. The index adds no new primitive, at the price of a second round
-trip and a counter table that every device must keep in step.
-
-\subsection{Future research directions}
-
-\begin{itemize}
-  \item \textbf{A safe commitment for the key update.} The update needs a commitment that both hides and binds,
-        with randomness, so that the broadcast commitments no longer reveal the shares.
-  \item \textbf{Safe parameters for 128-bit security.} PARAM~II needs a ring where the attack of
-        \cref{sec:param-ii} does not apply, for example a degree $n$ for which $X^n+1$ has no root modulo $q$, as at
-        PARAM~I. Another option is a version of the scheme in plain LWE.
-  \item \textbf{A faster quantum-safe PRF.} The labels, the HKDF and the password encoding all run the lattice PRF.
-        A faster PRF would speed up every user-side phase. In the counter index the label is one function, so it
-        can be swapped easily.
-  \item \textbf{Multi-keyword search.} Section IV-G of the paper sketches conjunctive, disjunctive and subset
-        queries. Neither our QPASE nor the counter index supports them yet.
-  \item \textbf{Deletion and backward privacy.} Our implementation has no deletion. Adding it while hiding deleted
-        files from later searches would give backward privacy as well.
-  \item \textbf{Syncing the counter table.} Two devices that upload at the same time can pick the same label. A
-        merge rule for concurrent counter tables would remove this limit.
-  \item \textbf{Binding requests to a session.} Signing the session identifier into each search and fetch request
-        would stop a server from replaying them.
-  \item \textbf{Constant-time code and a compiled implementation.} Our Gaussian sampler and extractor are not
-        constant-time, and Python is slow. An implementation in a compiled language would allow a fair comparison with the
-        paper's C++ timings.
-\end{itemize}
+Future work includes a hiding and binding commitment for the key update; 128-bit parameters in a ring where the
+attack of \cref{sec:param-ii} fails, or in plain LWE; a faster quantum-safe PRF, which would speed up every
+user-side phase; multi-keyword search; deletion with backward privacy; syncing the counter table across devices;
+binding search requests to the session; and a constant-time implementation in a compiled language.

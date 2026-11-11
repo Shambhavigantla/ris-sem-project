@@ -1,28 +1,15 @@
 \section{Literature Review and Preliminaries}
 \label{sec:background}
 
-\subsection{Related work}
+\paragraph{Related work.} Curtmola et al.\ defined the security of SSE and built schemes with an encrypted
+index~\cite{curtmola2006sse}. Cash et al.\ built dynamic schemes for very large databases from counter-based
+dictionaries~\cite{cash2014dynamic}, and Stefanov et al.\ and Bost made forward privacy a design
+goal~\cite{stefanov2014practical,bost2016sophos}. On the password side, Jarecki et al.\ built password-protected
+secret sharing from a threshold oblivious PRF (TOPRF)~\cite{jarecki2016highly}, and Chen et al.\ applied it to
+searchable encryption in PASE~\cite{chen2021pase}. Roy et al.\ and Jiang et al.\ moved password-protected secret
+sharing to lattices~\cite{roy2021pps,jiang2024qpause}, and QPASE adds keyword search~\cite{jiang2024qpase}.
 
-\paragraph{Searchable encryption.} Song, Wagner and Perrig gave the first practical scheme for searching
-encrypted data~\cite{song2000practical}. Curtmola et al.\ defined the security of searchable symmetric
-encryption and built schemes with an encrypted index~\cite{curtmola2006sse}. Other work added conjunctive and
-other richer queries~\cite{ballard2005conjunctive}. All of these assume that the user holds a long secret key.
-
-\paragraph{Keys from passwords.} Password-protected secret sharing (PPSS) lets a user recover a secret from a
-password and a threshold of servers~\cite{bagherzandi2011pps}. Jarecki et al.\ made it round-optimal and then
-built it from a threshold oblivious pseudorandom function (OPRF)~\cite{jarecki2014round,jarecki2016highly,
-jarecki2017toppss}. DPaSE derives many keys from one password~\cite{das2022dpase}. Password-authenticated keyword
-search and PASE apply the same idea to searchable encryption~\cite{huang2017paks,chen2021pase}. All of these rely
-on groups where the discrete logarithm is hard, which a quantum computer breaks~\cite{shor1994}.
-
-\paragraph{Quantum resistance.} Roy et al.\ built PPSS from lattices~\cite{roy2021pps}. Jiang et al.\ built a
-lattice threshold single-sign-on scheme with updatable server keys~\cite{jiang2022sso} and a password-protected
-outsourcing scheme, QPause~\cite{jiang2024qpause}. QPASE adds keyword search, which gives the first
-password-authenticated searchable encryption scheme that resists quantum attacks~\cite{jiang2024qpase}.
-
-\subsection{Notation}
-
-\Cref{tab:notation} lists the notation used in the rest of the report. It follows the QPASE paper.
+\paragraph{Notation.} \Cref{tab:notation} lists the notation. It follows the QPASE paper.
 
 \begin{table}[ht]
 \centering
@@ -33,101 +20,41 @@ password-authenticated searchable encryption scheme that resists quantum attacks
 \toprule
 \textbf{Symbol} & \textbf{Meaning} \\
 \midrule
-$\Rq = \mathbb{Z}_q[X]/(X^n+1)$ & polynomial ring, modulus $q$, degree $n$ \\
-$\ell = \lceil \log_2 q \rceil$ & width of the gadget vector \\
-$\chi_\sigma$ & discrete Gaussian distribution with standard deviation $\sigma$ \\
-$a, a_0, a_1 \in \Rq^{1\times\ell}$ & public vectors from Setup \\
-$G = (1, 2, \dots, 2^{\ell-1})$, $G^{-1}$ & gadget vector and binary decomposition \\
-$N$, $t$ & number of servers and threshold \\
-$S_i$, $k_i$, $pk_i$ & server $i$, its share of the master key $K$, its public key \\
-$U$, $ID_u$, $psw_u$ & user, identity and password \\
-$x \in \{0,1\}^L$ & binary encoding of the password \\
-$\Ku$ & user key output by the TOPRF \\
-$(pk_u, sk_u)$ & user's signature key pair, derived from $\Ku$ \\
+$\Rq = \mathbb{Z}_q[X]/(X^n+1)$, $\chi_\sigma$ & polynomial ring; discrete Gaussian with standard deviation $\sigma$ \\
+$a, a_0, a_1 \in \Rq^{1\times\ell}$, $G^{-1}$ & public vectors from Setup; binary decomposition \\
+$N$, $t$; $S_i$, $k_i$, $pk_i$ & servers and threshold; server $i$, its key share, its public key \\
+$U$, $ID_u$, $psw_u$, $x \in \{0,1\}^L$ & user, identity, password, and its binary encoding \\
+$\Ku$, $(pk_u, sk_u)$ & user key from the TOPRF; signature key pair derived from it \\
 $w$, $\dsk = \mathrm{HKDF}(\Ku, w)$ & keyword and its search key \\
 $C$, $Ct$, $i$ & encrypted document, its index ciphertext, its item id \\
-$\mu$, $\mu_u$ & limit on login attempts per epoch, and the user's current count \\
-$\lambda_i$ & Lagrange coefficient of server $i$ at $0$ \\
+$\mu$, $\lambda_i$ & login attempts allowed per epoch; Lagrange coefficient of server $i$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Ring learning with errors}
-
-All lattice operations in QPASE take place in $\Rq$. An element is a polynomial of degree below $n$ with
-coefficients in $\mathbb{Z}_q$, and a product wraps around with $X^n = -1$. Security rests on the decision
-learning-with-errors problem~\cite{regev2009lwe} in its ring form~\cite{lyubashevsky2010ring}.
-
-\begin{definition}[Decision ring-LWE]
-For a secret $s \leftarrow \chi_\sigma$, samples $(a, a s + e)$ with $a$ uniform in $\Rq$ and
-$e \leftarrow \chi_\sigma$ are computationally indistinguishable from pairs $(a, b)$ with $b$ uniform in $\Rq$.
-\end{definition}
-
-\subsection{Lattice pseudorandom function}
-
-QPASE uses the Banerjee--Peikert pseudorandom function (PRF)~\cite{banerjee2014prf}. The gadget vector
-$G = (1, 2, \dots, 2^{\ell-1})$ and its inverse $G^{-1}$, the bit decomposition of each coefficient, turn a vector
-in $\Rq^{1\times\ell}$ into an $\ell \times \ell$ matrix of binary polynomials with $G \cdot G^{-1}(v) = v$. For an
-input $x = (x_1, \dots, x_L) \in \{0,1\}^L$ and the public vectors $a_0, a_1$,
+\paragraph{Ring LWE and the lattice PRF.} All lattice operations take place in $\Rq$, where a product wraps around
+with $X^n = -1$. Security rests on ring learning with errors~\cite{regev2009lwe,lyubashevsky2010ring}: pairs
+$(a, as + e)$ with small $s, e$ look uniform. QPASE uses the Banerjee--Peikert PRF~\cite{banerjee2014prf}. For an
+input $x \in \{0,1\}^L$,
 \begin{equation}
 a_x = a_{x_1} \, G^{-1}\!\big(a_{x_2} \, G^{-1}( \cdots G^{-1}(a_{x_L}))\big),
 \qquad F_k(x) = \big\lfloor (p/q) \cdot a_x \cdot k \big\rceil .
 \label{eq:bp-prf}
 \end{equation}
-Computing $a_x$ takes $L-1$ steps, each a product of a $1 \times \ell$ vector with an $\ell \times \ell$ matrix of
-ring elements. The rounding to $\mathbb{Z}_p$ is the learning-with-rounding idea~\cite{alwen2013lwr}. We call one
-evaluation of $a_x$ a \emph{PRF chain}. \Cref{sec:evaluation-qpase} shows that this chain dominates the cost of the
-whole scheme.
+Computing $a_x$ takes $L - 1$ products of a vector with an $\ell \times \ell$ matrix of ring elements. We call one
+evaluation of $a_x$ a \emph{PRF chain}. It dominates the cost of the whole scheme.
 
-\subsection{Threshold OPRF with a robust extractor}
+\paragraph{Threshold OPRF.} Server $S_i$ holds a share $k_i$ of the master key $K$ and publishes $pk_i = ak_i +
+2e_i$. The user blinds its input as $b = ar + a_x + 2e$, each of $t$ servers returns $b_{k_i} = bk_i + 2e'_i$, and
+with the Lagrange coefficients the user computes
+\begin{equation}
+F = \sum_i \lambda_i b_{k_i} - r \sum_i \lambda_i pk_i = a_x K + 2e'' .
+\label{eq:toprf-combine}
+\end{equation}
+The noise $2e''$ changes at every login. The robust extractor of Ding et al.~\cite{ding2012kex} removes it: from a
+hint $\sigma = S(F)$ stored at Register, $\Ku = E(F, \sigma)$ is the same in every login. The servers create $K$ by
+a distributed key generation with Shamir sharing, so $K$ is never assembled anywhere.
 
-The TOPRF lets the user evaluate $F_K(x)$ on its password encoding $x$ under the master key $K$, which no single
-party holds~\cite{albrecht2021oprf,jiang2022sso}. Server $S_i$ holds a share $k_i$ of $K$ and publishes
-$pk_i = a k_i + 2e_i$. The protocol has three moves.
-\begin{enumerate}
-  \item \textbf{Blind.} The user samples $r, e \leftarrow \chi_\sigma$ and sends $b = a r + a_x + 2e$ to at
-        least $t$ servers. The term $a r + 2e$ hides $a_x$, and therefore the password.
-  \item \textbf{Evaluate.} Each contacted server returns $b_{k_i} = b k_i + 2e'_i$.
-  \item \textbf{Combine.} With the Lagrange coefficients $\lambda_i$ of the contacted servers, the user computes
-        \begin{equation}
-        F = \sum_i \lambda_i b_{k_i} - r \sum_i \lambda_i pk_i = a_x K + 2e'' .
-        \label{eq:toprf-combine}
-        \end{equation}
-\end{enumerate}
-The paper's Fig.~2 rounds $b$, $b_{k_i}$ and the public key $pk_i$ (written $vk_i$ there) to $\mathbb{Z}_p$; we
-send them unrounded, as its Fig.~1 does
-(\cref{sec:decisions}). The noise $2e''$ is even and small, but it changes from one login to the next, so rounding $F$ alone would give a
-slightly different key each time. QPASE removes it with the robust extractor of Ding et al.~\cite{ding2012kex}.
-For a coefficient $c$ in its centred representation, two signal functions mark whether $c$ lies near the
-boundary between the two halves of $\mathbb{Z}_q$:
-\[
-\sigma_0(c) = \begin{cases} 0 & c \in [-\lfloor q/4 \rfloor, \lfloor q/4 \rfloor] \\ 1 & \text{otherwise} \end{cases},
-\qquad
-\sigma_1(c) = \begin{cases} 0 & c \in [-\lfloor q/4 \rfloor + 1, \lfloor q/4 \rfloor + 1] \\ 1 & \text{otherwise.} \end{cases}
-\]
-The hint algorithm $S(y)$ outputs $\sigma_b(y)$ for a random bit $b$, and the extractor is
-$E(x, \sigma) = \big((x + \sigma \cdot \tfrac{q-1}{2}) \bmod q\big) \bmod 2$, in Ding et al.'s form; the paper
-prints a slightly different one (\cref{sec:decisions}). If $x - y$ is even and small, then
-$E(x, S(y)) = E(y, S(y))$. The user key is $\Ku = E(F, \sigma)$, one bit per coefficient.
-
-\subsection{Distributed key generation}
-
-The servers create the master key $K$ without a trusted dealer~\cite{bendlin2013share}. Each server $S_i$ deals a
-Shamir sharing of a random contribution $s_i$ to all servers, and server $S_j$ sums the shares it receives to get
-$k_j$. The master key $K = \sum_i s_i$ is never assembled anywhere. The paper's Definition~11 shares with
-polynomials of degree $t$, so $t + 1$ servers can use $K$ through their shares and $t$ learn nothing about it. We
-share with degree $t - 1$, so that the $t$ servers of a Login suffice (\cref{sec:decisions}).
-
-\subsection{Symmetric and signature primitives}
-
-\paragraph{HKDF and PRF.} QPASE derives a search key per keyword with an extract-then-expand key derivation
-function, $\dsk = \mathrm{HKDF}(\Ku, w)$~\cite{krawczyk2010hkdf}, and tags each document with
-$v = \mathrm{PRF}(\dsk, \rho)$ for a random $\rho$.
-
-\paragraph{Signatures.} The user signs its Login proof and every Outsource and Retrieve request, and the servers
-sign their key-update shares, with CRYSTALS-Dilithium~\cite{bai2021dilithium},
-standardised by NIST as ML-DSA~\cite{fips204}. The user's key pair is derived from $\Ku$, so it is never stored.
-
-\paragraph{Symmetric encryption.} Documents and index entries are encrypted with AES-256. Grover's algorithm
-halves its effective key length~\cite{grover1996}, which still leaves 128 bits of security. We use the
-authenticated Galois/Counter Mode~\cite{dworkin2007gcm}.
+\paragraph{Symmetric and signature primitives.} Keys come from HKDF~\cite{krawczyk2010hkdf}, signatures use
+ML-DSA-44~\cite{fips204}, and files and index entries use AES-256-GCM~\cite{dworkin2007gcm}. In QPASE, HKDF and the
+PRF are both built on the lattice PRF.
