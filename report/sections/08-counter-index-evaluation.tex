@@ -1,4 +1,67 @@
 \section{Evaluation of the Proposed Scheme}
 \label{sec:counter-evaluation}
 
-\todo{Write this section (handoff, Section~3.3): the notebook~07 results, then search time against storage size with the generated figure and table from notebook~08.}
+We use the same machine and run as \cref{sec:evaluation-qpase}. Notebook~07 shows that the index works, and
+notebook~08 measures search time against storage size for both schemes.
+
+\subsection{Functional results}
+
+Notebook~07 stores the same seven files as notebook~03 on three servers, at PARAM~I with $N = 3$ and $t = 2$.
+\begin{itemize}
+  \item \textbf{Small rows.} A row is a \CiLabelBytes{} label and a \CiEntryBytes{} entry, against \SizeCt{} for the
+        paper's $Ct$. The sealed counter table for four keywords is \CiSealedBytes, and each upload of it is
+        \CiUploadBytes{} per server. No keyword appears anywhere in the servers' stored bytes.
+  \item \textbf{Exact search.} A search for \texttt{medical} sends a \CiSearchRequestBytes{} request with three
+        labels. The servers do \CiLookups{} lookups in \CiRTwoAllServers{} in total, against \RTwoAllServers{} for
+        the paper's R2 in notebook~03, and the user recovers items \CiRecoveredItems, byte-equal to the originals.
+  \item \textbf{Forward privacy.} After a new \texttt{medical} upload, replaying the old request finds only items
+        \CiReplayItems, while a new search finds \CiNewSearchItems. In the paper's scheme the kept $\dsk$ matches
+        the new item.
+  \item \textbf{A new device} logs in, receives counter tables with versions \CiNewDeviceVersions, and rebuilds the
+        same table.
+\end{itemize}
+
+\subsection{Search time against storage size}
+
+Notebook~08 times one search for $N = 3$, 5 and 7 servers and $10^2$ to $10^5$ stored files per user, spread evenly
+over the servers. Each search has three matching files, one each on $S_1$, $S_2$ and $S_3$, uploaded through the
+real Outsource. The other files are filler written straight into server state: random ciphertexts of a real $Ct$'s
+length for the paper's scheme, and random rows for the counter index. Each setting runs once as a warm-up and then
+five times, with a fresh user and Login each time. All \ScalingChecks{} checked runs returned the right files
+(\ScalingFailures{} failures).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\linewidth]{search_scaling.png}
+\caption{Median search time at the slowest server against stored files per user, log scales. Drawn by
+\texttt{notebooks/08\_search\_scaling.ipynb}, cell 7.}
+\label{fig:search-scaling}
+\end{figure}
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Median search time over five runs: the slowest server in R2, the sum over all servers, and the user's
+whole Retrieve. Source: \texttt{notebooks/08\_search\_scaling.ipynb}, cell 7.}
+\label{tab:search-scaling}
+\resizebox{\linewidth}{!}{\input{generated/tables/search_scaling}}
+\end{table}
+
+\paragraph{Results.} At the slowest server the counter index took \ScalingIndexMin{} to \ScalingIndexMax{} in every
+setting, and the paper's scheme \ScalingPaperMin{} to \ScalingPaperMax{}: a speed-up of \ScalingSpeedupMin{} to
+\ScalingSpeedupMax{} times, median \ScalingSpeedupMedian{} (\cref{fig:search-scaling,tab:search-scaling}). There was
+no crossover. The counter index was faster at every size and every $N$.
+
+\paragraph{Why.} The speed-up does not come mainly from avoiding the scan, since a non-matching item costs only a
+failed AES-GCM tag check. The paper's slowest server holds one match and runs one PRF chain (\AxMedian) for it; we
+infer that this chain is most of its time. The counter index's server runs no chain, and its time is close to one
+ML-DSA-44 verification (\CostVerifyMedian). The scan still shows at $10^5$ files: at $N = 3$ the paper's slowest
+server rises from \ScalingPaperThreeTenThousand{} at $10^4$ files to \ScalingPaperThreeHundredThousand, while the
+counter index stays flat. Summed over the servers, the counter index grows with $N$, from \ScalingIndexSumThree{}
+to \ScalingIndexSumSeven, because each server verifies the request, so the summed speed-up falls from
+\ScalingSumSpeedupThree{} to \ScalingSumSpeedupSeven{} times at $10^2$ files.
+
+\paragraph{The user.} The user's Retrieve took \ScalingUserPaperMin{} to \ScalingUserPaperMax{} in the paper's
+scheme and \ScalingUserIndexMin{} to \ScalingUserIndexMax{} with the counter index. Both run four PRF chains for
+three matches: $\dsk$ and three checks of $v$, or $K_w$ and three labels. The index moves work off the servers but
+does not make a search faster for the user.

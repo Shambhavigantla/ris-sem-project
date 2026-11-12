@@ -1,4 +1,14 @@
 \section{Conclusion and Future Research Directions}
 \label{sec:conclusion}
 
-\todo{Write this section (handoff, Section~3.5): what the project showed, and what remains open.}
+We implemented QPASE from the paper alone, and it works as described once its gaps are filled. The lattice PRF sets
+its cost: one chain takes \AxMedian{}, and chains take at least \ChainShareMin{} of every user-side phase. PARAM~II
+is unsafe in the ring $\mathbb{Z}_q[X]/(X^{595}+1)$, and the linear key-update commitments reveal the shares. Our
+counter-based index keeps the search key on the device, gives forward privacy, and made the slowest server's search
+\ScalingSpeedupMin{} to \ScalingSpeedupMax{} times faster, mostly by removing the server's PRF chain per match. The
+user's cost is unchanged, at the price of a second round trip and a shared counter table.
+
+Future work includes a hiding and binding commitment for the key update; 128-bit parameters in a ring where the
+attack of \cref{sec:param-ii} fails, or in plain LWE; a faster quantum-safe PRF, which would speed up every
+user-side phase; multi-keyword search; deletion with backward privacy; syncing the counter table across devices;
+binding search requests to the session; and a constant-time implementation in a compiled language.

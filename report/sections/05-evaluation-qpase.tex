@@ -1,94 +1,41 @@
 \section{Evaluation of the Reproduced Scheme}
 \label{sec:evaluation-qpase}
 
-\subsection{Setup}
-
-All measurements ran on the machine in \cref{tab:machine}, and \cref{tab:notebook-cost} gives what each notebook
-cost to run on it. The protocol notebooks use PARAM~I with
-$N = \RegisterN$ servers and threshold $t = \RegisterT$. \Cref{sec:param-ii} explains why we do not use PARAM~II.
-The cost notebook pins its process to logical CPU~2, a performance-core thread on this machine, and runs each
-measured item once as a warm-up and then at least seven times; \cref{tab:cost-blocks} gives the count for each
-building block. We report the median and the range. Every timed
-run also checks its own result, and all \CostChecks{} checked runs gave the right answer
-(\CostFailures{} failures). Timings belong to this machine. Message sizes, counts and pass or fail results are the
-same on any machine.
-
-\begin{table}[ht]
-\centering
-\small
-\caption{Test machine.}
-\label{tab:machine}
-\begin{tabular}{lp{0.66\linewidth}}
-\toprule
-\textbf{Item} & \textbf{Value} \\
-\midrule
-Processor & \MachineCPU \\
-Memory & \MachineMemory \\
-Operating system & Arch Linux, kernel \MachineOS \\
-Python & \MachinePython \\
-Packages & \MachinePackages \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[ht]
-\centering
-\small
-\caption{Cost of running each notebook on the test machine. Wall time and peak memory are those of the
-notebook's own kernel, printed by its last cell.}
-\label{tab:notebook-cost}
-\begin{tabular}{lrr}
-\toprule
-\textbf{Notebook} & \textbf{Wall time} & \textbf{Peak memory} \\
-\midrule
-01 preliminaries & \WallOne & \PeakOne \\
-02 register and login & \WallTwo & \PeakTwo \\
-03 outsource and retrieve & \WallThree & \PeakThree \\
-04 server key update & \WallFour & \PeakFour \\
-05 costs & \WallFive & \PeakFive \\
-06 PARAM~II attack & \WallSix & \PeakSix \\
-07 counter index & \WallSeven & \PeakSeven \\
-08 search scaling & \WallEight & \PeakEight \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Setup.} All measurements ran on one machine (\MachineCPU, \MachineMemory, Arch Linux, Python
+\MachinePython). The protocol notebooks use PARAM~I with $N = \RegisterN$ and $t = \RegisterT$; \cref{sec:param-ii}
+explains why we do not use PARAM~II. The cost notebook pins itself to one CPU, runs each item once as a warm-up and
+then at least seven times, and reports the median. All \CostChecks{} checked runs gave the right answer
+(\CostFailures{} failures). Timings belong to this machine; sizes and pass or fail results do not.
 
 \subsection{Functional results}
 
-Each item below is printed by a notebook and checked by its assertion cells.
 \begin{itemize}
-  \item \textbf{The TOPRF noise stays small.} In one run the largest coefficient of the noise $2e''$ was
-        \ToprfNoiseMax, and two TOPRF outputs for the same password differed by at most \ToprfLoginNoiseMax. Both
-        are tiny next to the extractor's bound $q/4 = \QuarterQ$, so in that run the extractor was certain to return
-        the same key.
-  \item \textbf{The same password gives the same key.} \LoginsIdentical{} repeated logins produced a
-        byte-identical $\Ku$ and $pk_u$. Logging in through the server subsets $\{1, 2\}$ and $\{2, 3\}$ gave the
-        same key as Register.
-  \item \textbf{Wrong passwords and blocked subsets fail.} A wrong password is caught at step L2, and each
-        contacted server counts the attempt. Once a server's counter reaches $\mu = \MuLimit$ it refuses L1 even
-        for the right password. The subset $\{1, 3\}$, whose Lagrange coefficients are not integers, is refused
-        before any server is contacted.
-  \item \textbf{Search returns exactly the matching documents.} Notebook~03 stores seven real documents on three
-        servers. A search for \texttt{medical} returns items \RecoveredItems, byte-equal to the originals. A
-        keyword with no documents returns nothing. A server that flips a bit of an index ciphertext, or swaps a
-        stored document, cannot get the altered item past the checks of R2 and R3.
-  \item \textbf{The key update leaves users unaffected.} \UpdateSharesAccepted{} update shares pass the checks,
-        every $k_i$ and $pk_i$ changes, and the master key stays the same. After two updates (epochs
-        \UpdateEpochsAfterTwo) the user logs in with the same $\Ku$ and retrieves documents stored before the first
-        update. Replayed and forged shares are rejected, and the receiving server's state does not change.
+  \item \textbf{The same password gives the same key.} The TOPRF noise stayed below \ToprfLoginNoiseMax, far inside
+        the extractor's bound $q/4 = \QuarterQ$, and \LoginsIdentical{} repeated logins gave a byte-identical $\Ku$.
+        Logins through different server subsets gave the same key as Register.
+  \item \textbf{Wrong passwords fail.} A wrong password is caught at L2, and after $\mu = \MuLimit$ attempts a
+        server refuses even the right one.
+  \item \textbf{Search returns exactly the matching documents.} With seven real documents on three servers, a
+        search for \texttt{medical} returns items \RecoveredItems, byte-equal to the originals. Tampered index
+        entries and swapped documents fail the checks of R2 and R3.
+  \item \textbf{The key update leaves users unaffected.} \UpdateSharesAccepted{} update shares pass, every $k_i$
+        changes, $K$ stays the same, and after two updates the user still logs in and retrieves old documents.
 \end{itemize}
 
-\subsection{Computation cost}
+\subsection{Computation and communication cost}
 
-\Cref{fig:phase-costs} shows the time of each phase at the user and at one server, and
-\cref{tab:cost-blocks,tab:cost-phases} give the numbers. The user's phases take between \CostOutsourceUser{}
-and \CostLoginUser. The server's phases take a few milliseconds, except Retrieve and the key update.
+\Cref{fig:phase-costs} shows the time of each phase, and \cref{tab:cost-blocks,tab:cost-phases} give the numbers.
+One number explains most of it: a PRF chain takes \AxMedian.
+Every HKDF and PRF call is a chain, and so is the password encoding. The user's Register runs three chains, Login
+four, Outsource two and Retrieve three, and chains take at least \ChainShareMin{} of each user-side phase. A server
+runs a chain only in Retrieve, one per matching item. Its Retrieve therefore takes \CostRetrieveServer{} with two
+matches, while its Login takes \CostLoginServer, mostly one ML-DSA-44 verification (\CostVerifyMedian).
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.86\linewidth]{phase_costs.png}
-\caption{Computation time per phase at the user and at one server, on a log scale: the median of 7 runs and the
-fastest to the slowest run. Drawn by \texttt{notebooks/05\_costs.ipynb}, cell 13.}
+\includegraphics[width=0.72\linewidth]{phase_costs.png}
+\caption{Time per phase at the user and at one server, log scale, median and range of 7 runs. Drawn by
+\texttt{notebooks/05\_costs.ipynb}, cell 13.}
 \label{fig:phase-costs}
 \end{figure}
 
@@ -104,35 +51,23 @@ cell 13.}
 \begin{table}[ht]
 \centering
 \small
-\caption{Each phase per party. ``PRF chains'' counts the lattice PRF evaluations in the phase. ``Share in PRF
-chains'' divides the chain count times the $a_x$ time measured right after each run by that run's phase time, so it
-can read slightly above 100\% when a phase is all PRF work. The limiter is the term of the cost model that takes the
-largest share. Source: \texttt{notebooks/05\_costs.ipynb}, cell 13.}
+\caption{Each phase per party. ``PRF chains'' counts the lattice PRF evaluations in the phase, and ``share in PRF
+chains'' is their share of the phase time. The limiter is the term that takes the largest share. Source:
+\texttt{notebooks/05\_costs.ipynb}, cell 13.}
 \label{tab:cost-phases}
 \resizebox{\linewidth}{!}{\input{generated/tables/cost_phases}}
 \end{table}
 
-One number explains most of these times. A PRF chain, one evaluation of $a_x$, takes \AxMedian. Every HKDF and
-PRF call in our implementation is a chain, and so is the password encoding in the TOPRF. The user's Register runs
-three chains, Login four, Outsource two, and Retrieve three, and those chains account for at least
-\ChainShareMin{} of each phase (\cref{tab:cost-phases}). A server runs no chain except in Retrieve, where it runs one for each item that matches
-the query. That is why a server's Retrieve takes \CostRetrieveServer{} with two matching items, while its Login
-takes \CostLoginServer, mostly one ML-DSA-44 verification at \CostVerifyMedian. The key update is dominated by
-ML-DSA-44 signing (\CostSignMedian{} median). Encrypting a 100~KB document with AES-256-GCM takes only
-\CostAesMedian.
-
-\subsection{Comparison with the paper's reported costs}
-
-\Cref{tab:paper-vs-ours} sets our medians next to the paper's Table IV. The paper measured a C++ implementation
-with NTL on an AMD Ryzen 7 5800H, at PARAM~II with $N = t = 2$~\cite{jiang2024qpase}. We measured Python at
-PARAM~I with $N = 3$ and $t = 2$. Our user-side Register and Login take about \RatioRegisterUser{} and
-\RatioLoginUser{} times as long as the paper reports, and Outsource and Retrieve about \RatioOutsourceUser{} and
-\RatioRetrieveUser{} times as long.
+\Cref{tab:paper-vs-ours} compares our medians with the paper's Table IV, which measured C++ at PARAM~II with
+$N = t = 2$~\cite{jiang2024qpase}. Our user-side phases take \RatioRetrieveUser{} to \RatioLoginUser{} times as
+long. Part of the gap is Python, but most of it is the PRF: the paper lists one PRF evaluation at 0.554~ms, and our
+chain takes about \RatioPrf{} times as long. A full chain needs \RingProductsChain{} ring products. We infer that
+the paper's PRF timing measures a smaller computation than a full chain.
 
 \begin{table}[ht]
 \centering
 \small
-\caption{Time per phase: the paper's Table IV against our medians from \cref{tab:cost-phases}.}
+\caption{Time per phase: the paper's Table IV against our medians (\texttt{notebooks/05\_costs.ipynb}, cell 13).}
 \label{tab:paper-vs-ours}
 \begin{tabular}{lrrrr}
 \toprule
@@ -148,25 +83,15 @@ Retrieve & 30.95 ms & \CostRetrieveUser & 15.69 ms & \CostRetrieveServer \\
 \end{tabular}
 \end{table}
 
-Part of the gap is the language: our ring products run through numpy from Python. Most of it is the PRF. The
-paper's Table III lists one PRF evaluation at 0.554~ms and one HKDF evaluation at 0.02~ms; our chain takes
-\AxMedian, about \RatioPrf{} times the paper's PRF figure. A full evaluation of \cref{eq:bp-prf} needs
-$(L-1)\,\ell^2$ ring products, which is \RingProductsChain{} at $L = \ParamL$ and $\ell = \ParamEll$, and our
-profile attributes most of the chain's time to those products. The paper names the lattice PRF of Banerjee and
-Peikert for both functions (its Sections II-C and V) but gives no implementation detail. We infer that its PRF and
-HKDF timings measure a smaller computation than a full chain; the cause is unknown to us. This matters for the conclusions: in our implementation the lattice PRF,
-not the TOPRF or the signatures, sets the cost of every user-side phase.
-
-\subsection{Communication cost}
-
-\Cref{fig:traffic} and \cref{tab:cost-traffic} give the exact bytes each phase sends. The lattice vectors dominate.
-Each of $b$, $b_{k_i}$ and $pk_i$ is \SizePublicVector, so Register sends three of them per server and Login three
-per contacted server. Outsource is dominated by the 100~KB document itself, and Retrieve by the two matching
+\Cref{fig:traffic} and \cref{tab:cost-traffic} give the bytes each phase sends. Message sizes are of the same order
+as the paper's. Each lattice vector is \SizePublicVector, so Register sends \TrafficRegister{} in total with $N = 3$
+and Login \TrafficLogin{} with $t = 2$, against about 550~kB and 262~kB in the paper's Table IV. Outsource
+(\TrafficOutsource) is dominated by the 100~KB document, and Retrieve (\TrafficRetrieve) by the two matching
 documents that come back.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.86\linewidth]{traffic.png}
+\includegraphics[width=0.72\linewidth]{traffic.png}
 \caption{Bytes each phase sends, split by direction, with $N = 3$ servers. Drawn by
 \texttt{notebooks/05\_costs.ipynb}, cell 13.}
 \label{fig:traffic}
@@ -181,67 +106,43 @@ documents per Retrieve. Source: \texttt{notebooks/05\_costs.ipynb}, cell 13.}
 \input{generated/tables/cost_traffic}
 \end{table}
 
-The paper's Table IV reports about 4{,}404{,}019 bits for Register and 2{,}097{,}152 bits for recovering $\Ku$,
-roughly 550~kB and 262~kB, with $N = t = 2$. Our Register (\TrafficRegister, $N = 3$) and Login (\TrafficLogin,
-$t = 2$) are of the same order. For Outsource and Retrieve the paper reports about 111{,}332 and 119{,}050 bits.
-111{,}332 bits is 13.9~kB, less than the 100~KB file being outsourced, so we read these two figures as bytes; the
-paper does not say. In bytes they agree with our Outsource of \TrafficOutsource.
-
 \subsection{Security findings}
 \label{sec:findings}
 
-\subsubsection{PARAM II in the ring \texorpdfstring{$\mathbb{Z}_q[X]/(X^{595}+1)$}{Z\_q[X]/(X\^{}595+1)} allows offline password guessing}
+\subsubsection{PARAM II allows offline password guessing in our ring}
 \label{sec:param-ii}
 
-Table II gives PARAM~II the degree $n = 595$. We run it in the ring of the scheme text, $\Rq = \mathbb{Z}_q[X]/(X^n+1)$
-(\cref{sec:decisions}). Because 595 is odd, $(-1)^{595} + 1 = 0$, so $X = -1$ is a root of $X^{595}+1$, and
-evaluating a polynomial at $-1$,
-\[
-\varphi(a) = a(-1) = \sum_i (-1)^i a_i \bmod q,
-\]
-is a ring homomorphism from $\Rq$ to $\mathbb{Z}_q$. It turns each ring-LWE sample into a one-dimensional sample
-that is easy to solve. A server that receives one blinded TOPRF request $b = a r + a_x + 2e$ can test a password
-guess $x'$ offline. It computes $c_j = \varphi(b_j) - \varphi(a_{x',j}) = \varphi(a_j)\varphi(r) + 2\varphi(e_j) +
-\varphi(a_{x,j} - a_{x',j})$ for each of the $\ell$ entries. For the right guess the last term vanishes, and
-$\varphi(r)$ and $\varphi(e_j)$ are sums of 595 small Gaussians, about $\sigma\sqrt{n} = \ParamIISigmaSqrtN$ in size.
-The server tries every $\rho$ with $|\rho| \le \ParamIIRadius$ and keeps the guess if $c_j - \rho\,\varphi(a_j)$ is
-small in every entry. A wrong guess leaves the last term uniform in $\mathbb{Z}_q$, so no $\rho$ fits.
+PARAM~II has the odd degree $n = 595$, so $X = -1$ is a root of $X^{595}+1$, and $\varphi(a) = a(-1) \bmod q$ maps
+$\Rq$ onto $\mathbb{Z}_q$. It turns the blinded TOPRF request $b = ar + a_x + 2e$ into one-dimensional samples
+$\varphi(b_j) - \varphi(a_{x',j}) = \varphi(a_j)\varphi(r) + 2\varphi(e_j) + \varphi(a_{x,j} - a_{x',j})$. For the
+right guess $x'$ the last term vanishes and the rest is small, so a server can test password guesses offline from a
+single login request. On a dictionary of \ParamIIGuesses{} passwords (\cref{fig:param-ii,tab:param-ii}), the real password left
+a residual of \ParamIITrueResidual, below the threshold \ParamIITau, and every wrong guess at least
+\ParamIIMinWrong. The test took \ParamIIAttackTime. At PARAM~I, $X^{512}+1$ has no root modulo $q$ and nothing
+matches. The paper's estimate probably assumes plain LWE, so this flaw belongs to our reading of the parameters. All
+other experiments use PARAM~I.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.82\linewidth]{param_ii_residuals.png}
-\caption{Residual of each of \ParamIIGuesses{} guesses against one blinded login request. Below the threshold
-$\tau$ a guess matches. Drawn by \texttt{notebooks/06\_param\_ii\_offline\_guessing.ipynb}, cell 7.}
+\includegraphics[width=0.62\linewidth]{param_ii_residuals.png}
+\caption{Residual of each guess against one login request; below $\tau$ a guess matches. Drawn by
+\texttt{notebooks/06\_param\_ii\_offline\_guessing.ipynb}, cell 7.}
 \label{fig:param-ii}
 \end{figure}
 
 \begin{table}[ht]
 \centering
 \small
-\caption{The offline test against one request. Source:
-\texttt{notebooks/06\_param\_ii\_offline\_guessing.ipynb}, cell 7.}
+\caption{The offline test against one request. Source: \texttt{notebooks/06\_param\_ii\_offline\_guessing.ipynb},
+cell 7.}
 \label{tab:param-ii}
 \resizebox{\linewidth}{!}{\input{generated/tables/param_ii}}
 \end{table}
 
-Notebook~06 runs the test over a dictionary of \ParamIIGuesses{} common passwords that contains the real one
-(\cref{fig:param-ii,tab:param-ii}). At PARAM~II the real password leaves a residual of \ParamIITrueResidual, below
-the threshold $\tau = \ParamIITau$, and every wrong guess leaves at least \ParamIIMinWrong. The whole dictionary
-took \ParamIIAttackTime. At PARAM~I, $X^{512}+1$ has no root modulo $q$, and nothing matches: the real password's
-residual (\ParamIReal) is as large as the wrong guesses'. The attack breaks the resistance to offline guessing, the
-first attack in the paper's threat model, for PARAM~II as we run it. The paper's security estimate for $n = 595$
-probably assumes plain LWE, where this attack does not apply, so the flaw belongs to our reading of the parameters
-and is not proven of the paper. All other experiments therefore use PARAM~I.
-
 \subsubsection{The linear key-update commitments reveal the shares}
 
-Step 4 of the key update checks $H(F_{ji}) = \sum_k i^k H(\alpha_k)$, which requires $H$ to be linear. We use
-$H(x) = A_H x \bmod q$ with a square matrix $A_H$ expanded from SHAKE256. A random square matrix modulo the prime
-$q$ is invertible with overwhelming probability, and ours is: \texttt{report/tools/invert\_commitment.py} solves
-$A_H x = h$ by Gaussian elimination modulo $q$ and recovers a random $\alpha$ from its commitment $H(\alpha)$
-exactly. This check runs outside the notebooks. The broadcast commitments $h_k = H(\alpha_k)$ therefore reveal
-each $\alpha_k$, hence every share $F_{ji}$ and every key change $k'_i - k_i$, to anyone who sees them. The update
-no longer protects a key share that leaked in an earlier epoch. Another linear $H$ only moves the problem. An
-injective $H$ can be inverted in the same way. A compressing $H$ hides part of $\alpha_k$, but then a dealer can
-add a vector from its kernel and change a share without changing $H$, so the commitment no longer binds. The shares still verify and $K$ still stays the same, but a fix needs a hiding commitment with randomness,
-which the paper does not specify.
+The key-update check $H(F_{ji}) = \sum_k i^k H(\alpha_k)$ needs a linear $H$. We use $H(x) = A_H x \bmod q$ with a
+square matrix $A_H$, which is invertible: \texttt{report/tools/invert\_commitment.py} recovers $\alpha$ from
+$H(\alpha)$ exactly. The broadcast commitments therefore reveal every share and every key change. A compressing
+$H$ would hide part of $\alpha$ but no longer bind. A fix needs a hiding commitment with randomness, which the paper
+does not specify.

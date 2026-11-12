@@ -1,4 +1,62 @@
 \section{Proposed Scheme: A Counter-Based Search Index}
 \label{sec:counter-index}
 
-\todo{Write this section (handoff, Section~3.1): the two problems of QPASE's search, the design (keys, labels, index rows, counter table), and the changed phases (Login L4, Outsource, Retrieve) as \texttt{protocol} boxes like those in \cref{sec:qpase}.}
+The paper's search has two problems. \textbf{The search key is permanent}: a server can keep $\dsk$ from one search
+and test every later upload with it, so the scheme has no forward privacy. \textbf{Every search tries every item}:
+the server tries $\dsk$ on all stored items and runs one lattice PRF chain per match. We replace the per-item tags
+with an encrypted lookup table in the style of Cash et al.~\cite{cash2014dynamic}. The full design is in
+\texttt{docs/counter-index-spec.md}.
+
+\subsection{Design}
+
+\paragraph{Keys.} The user derives three keys from $\Ku$, and none leaves the device: the keyword key
+$K_w = \mathrm{HKDF}(\Ku, w)$, which is the paper's $\dsk$, and the pointer key $k_{ptr}$ and counter key $k_{ctr}$,
+the two halves of one HKDF output.
+
+\paragraph{Labels and rows.} The $j$-th file under keyword $w$ gets the label
+$\mathit{label}(w, j) = \mathrm{PRF}(K_w, j)$, truncated to \CiLabelBytes. Its row stores the label with the entry
+\[
+\mathit{entry} = \mathrm{Enc}\big(k_{ptr},\ (\mathit{label},\ i,\ \mathrm{SHA3\text{-}256}(C))\big).
+\]
+The entry hides which file the row points to. The label inside stops a server from moving the entry to another
+label, and the hash binds the row to one file. Each server keeps a dictionary per user from label to entry.
+
+\paragraph{Counter table.} The table maps each keyword to $c_w$, the number of files under it. The user holds it
+during a session. The servers keep a copy sealed under $k_{ctr}$, padded to 1024-byte blocks to hide the number of
+keywords, versioned, and signed with $sk_u$, so a new device gets the same counters. A server accepts an upload only
+with a valid signature and a higher version.
+
+\subsection{Phases}
+
+Register, Login steps L1 to L3 and the key update do not change, and since $\Ku$ survives a key update, so do the
+labels.
+
+\begin{protocol}{Login step L4 and Outsource with the counter index}
+\begin{enumerate}[1.]
+  \item \textbf{L4.} After L3, $U$ fetches the sealed table from each contacted server. It keeps the uploads whose
+        signature verifies and whose table opens with the signed version inside, and takes the highest version.
+  \item \textbf{O1.} For a file $d$ under $w$ with item id $i$, $U$ sets $j = c_w + 1$ and computes
+        $\mathit{label}(w, j)$, $C = \mathrm{Enc}(\Ku, d)$ and the entry. It sends them with a signature to one
+        server.
+  \item \textbf{O2.} The server verifies the signature and stores the row and $C$, unless the label already exists
+        or the user's $M$ slots are full.
+  \item \textbf{O3.} After the server accepts, $U$ sets $c_w = j$ and uploads the new sealed table to all $N$
+        servers. If the label already existed, an earlier upload was interrupted; $U$ moves to the next label.
+\end{enumerate}
+\end{protocol}
+
+\begin{protocol}{Retrieve with the counter index}
+\begin{enumerate}[R1.]
+  \item If $c_w = 0$, $U$ returns nothing. Otherwise it sends the signed list $\mathit{label}(w, 1), \dots,
+        \mathit{label}(w, c_w)$ to all $N$ servers.
+  \item Each server verifies the signature, does $c_w$ dictionary lookups, and returns the rows it holds.
+  \item $U$ drops rows whose label it did not ask for, opens each entry with $k_{ptr}$, drops entries whose inside
+        label differs, and keeps duplicates once.
+  \item $U$ sends a signed list of item ids to each server that returned hits and gets back the files.
+  \item $U$ checks each file's hash against its entry and decrypts $d = \mathrm{Dec}(\Ku, C)$.
+\end{enumerate}
+\end{protocol}
+
+Retrieve takes two round trips, because a server cannot follow an encrypted pointer. Unlike forward-private schemes
+such as Bost's~\cite{bost2016sophos}, our keys come from a password through the TOPRF, so the user stores no key on
+any device.

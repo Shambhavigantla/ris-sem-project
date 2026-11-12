@@ -1,4 +1,54 @@
 \section{Analysis of the Proposed Scheme}
 \label{sec:counter-analysis}
 
-\todo{Write this section (handoff, Section~3.2): correctness, the leakage table (what a server learns), the forward-privacy argument, resilience against server attacks, and the costs we accept.}
+We argue informally, in the threat model of \cref{sec:qpase}, and give no formal proof.
+
+\paragraph{Correctness.} Each upload under $w$ takes the next counter value, and $c_w$ grows only after a server
+accepts the row, so the rows under $w$ carry exactly the labels $1$ to $c_w$. R1 asks all servers for all of them.
+A label of another keyword comes from another $K_w$ and collides only with negligible probability. R3 keeps only
+genuine entries, which a server cannot forge under AES-256-GCM, and R5 checks each file's hash. A search therefore
+returns exactly the files under $w$.
+
+\paragraph{Leakage.} \Cref{tab:ci-leakage} lists what a server learns. Both schemes leak the search pattern and
+which files a search returns. The difference is the last row.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{What a server learns from the counter index.}
+\label{tab:ci-leakage}
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+\textbf{Event} & \textbf{What the server learns} \\
+\midrule
+Outsource & a random-looking row, the file $C$, and the counter table's size in 1024-byte blocks and its version \\
+Search & the $c_w$ labels, which of them it holds, and which files the user fetches \\
+Repeated search & the same labels again, so it can link the searches (search pattern) \\
+Upload after a search & nothing that links the new row to the old labels \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Forward privacy.} The server never receives $K_w$. A later upload under $w$ gets
+$\mathit{label}(w, c_w + 1)$, a PRF output it cannot compute from the labels it has seen. A stored search request
+therefore finds only files that existed when it was made~\cite{stefanov2014practical}. The scheme does not give
+backward privacy, and our implementation has no deletion.
+
+\paragraph{Attacks by a dishonest server.} Our tests check each of these.
+\begin{itemize}
+  \item \textbf{Moving an entry to another label} fails at R3, because the label inside the entry differs.
+  \item \textbf{Swapping a stored file} fails at R5, because its hash differs from the one in the entry.
+  \item \textbf{Answering with another keyword's row} would pass the entry check, since all entries share
+        $k_{ptr}$, but R3 first drops any row whose label the user did not ask for.
+  \item \textbf{Serving a forged or stale counter table} fails: tables are signed under $pk_u$, and the user takes
+        the highest version. Since fewer than $t$ servers are corrupt, one of the $t$ contacted at Login is honest
+        and serves the latest table.
+  \item \textbf{Replaying a search request} returns only the old labels' rows. The requests do not include the
+        session identifier, so a replay verifies, but it reveals nothing new.
+\end{itemize}
+
+\paragraph{Costs and quantum resistance.} The design costs a counter table that grows with the number of keywords,
+a download at Login, an upload to every server per file, a second round trip per search, and a request that grows
+with $c_w$. Two devices that upload at once must sync the counter. The index adds no new primitive beyond SHA3-256:
+it uses the lattice PRF, HKDF, AES-256-GCM and ML-DSA-44 that QPASE already relies on. We therefore expect it to be
+as quantum resistant as QPASE, though we have no proof.

@@ -1,4 +1,59 @@
 \section{Comparative Study}
 \label{sec:comparison}
 
-\todo{Write this section (handoff, Section~3.4): the paper's scheme against the counter index, and QPASE against related password-based schemes.}
+\Cref{tab:qpase-vs-ci} compares the paper's search with the counter index, using our measurements. The counter
+index wins on the server side: the key stays on the device, it is forward private, and its rows are smaller. It
+pays with a second round trip and a counter table to store and upload. The user's cost is the same.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{The paper's search against the counter index (notebooks~03, 07 and~08).}
+\label{tab:qpase-vs-ci}
+\begin{tabularx}{\linewidth}{lXX}
+\toprule
+\textbf{Property} & \textbf{QPASE} & \textbf{Counter index} \\
+\midrule
+Search key leaves the device & yes, $\dsk$ goes to every server & no, only labels \\
+Server work per search & try $\dsk$ on every item, one PRF chain per match & $c_w$ lookups, one signature check \\
+Slowest server per search & \ScalingPaperMin{} to \ScalingPaperMax & \ScalingIndexMin{} to \ScalingIndexMax \\
+Forward privacy & no & yes \\
+Round trips per search & 1 & 2 \\
+Index storage per file & \SizeCt & \CiLabelBytes{} + \CiEntryBytes, plus the counter table \\
+User's PRF chains per search & $1 + c_w$ & $1 + c_w$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\Cref{tab:related} summarises the paper's Table~V, which compares QPASE with earlier password-based
+schemes~\cite{jiang2024qpase}. QPASE is the only one that is both quantum resistant and supports data retrieval.
+The overhead column counts only exponentiations $T_{exe}$, so the lattice schemes read $0 / 0$. That does not mean
+they are cheap: in our implementation one lattice PRF chain takes \AxMedian. The counter index keeps every property
+in QPASE's row and adds forward privacy, which the table does not compare.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{QPASE against related password-based schemes, from Table~V of the paper~\cite{jiang2024qpase}. UR is
+uniformly random; HE and FHE are (fully) homomorphic encryption.}
+\label{tab:related}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+\textbf{Scheme} & \textbf{Threshold} & \textbf{Passwords} & \textbf{Model} & \textbf{Technique} &
+\textbf{Quantum} & \textbf{Retrieval} & \textbf{Rounds} & \textbf{Server / user} \\
+\midrule
+Bagherzandi et al.\ (CCS'11) & $(t, N)$ & UR & ROM & HE & no & no & 2 & $16 / 33\,T_{exe}$ \\
+Camenisch et al.\ (CCS'12) & $(2, 2)$ & -- & UC & HE & no & no & 1 & $26 / 19\,T_{exe}$ \\
+Jarecki et al.\ (ASIACRYPT'14) & $(t, N)$ & UR & ROM & OPRF & no & no & 1 & $4 / 11\,T_{exe}$ \\
+Yi et al.\ (ESORICS'15) & $(t, N)$ & UR & UC & HE & no & no & 1 & $12 / 7\,T_{exe}$ \\
+Jarecki et al.\ (EuroS\&P'16) & $(t, N)$ & UR & UC & OPRF & no & no & 1 & $1 / 4\,T_{exe}$ \\
+Jarecki et al.\ (ACNS'17) & $(t, N)$ & UR & UC & OPRF & no & no & 1 & $1 / 2\,T_{exe}$ \\
+Das et al.\ (AsiaCCS) & $(N, N)$ & UR & UC & OPRF & no & no & 2 & $4 / 10\,T_{exe}$ \\
+Chen et al.\ (PASE, IJIS'21) & $(2, 2)$ & UR & ROM & HE & no & yes & 1 & $8 / 3\,T_{exe}$ \\
+Roy et al.\ (ACNS'21) & $(t, N)$ & UR & ROM & FHE & yes & no & 1 & $0 / 0$ \\
+Jiang et al.\ (QPause, TSC'23) & $(t, N)$ & Zipf & ROM & FHE & yes & no & 1 & $0 / 0$ \\
+QPASE & $(t, N)$ & Zipf & ROM & OPRF & yes & yes & 1 & $0 / 0$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
